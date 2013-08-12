@@ -1,5 +1,5 @@
-// Version: v1.0.0-rc.6-242-g15a358a
-// Last commit: 15a358a (2013-08-01 07:09:51 -0700)
+// Version: v1.0.0-rc.6-246-g5766659
+// Last commit: 5766659 (2013-08-01 14:24:44 -0700)
 
 
 (function() {
@@ -156,8 +156,8 @@ Ember.deprecateFunc = function(message, func) {
 
 })();
 
-// Version: v1.0.0-rc.6-242-g15a358a
-// Last commit: 15a358a (2013-08-01 07:09:51 -0700)
+// Version: v1.0.0-rc.6-279-gf56e0fc
+// Last commit: f56e0fc (2013-08-09 18:26:31 -0700)
 
 
 (function() {
@@ -6196,13 +6196,13 @@ function mixinProperties(mixinsMeta, mixin) {
   }
 }
 
-function concatenatedProperties(props, values, base) {
+function concatenatedMixinProperties(concatProp, props, values, base) {
   var concats;
 
   // reset before adding each new mixin to pickup concats from previous
-  concats = values.concatenatedProperties || base.concatenatedProperties;
-  if (props.concatenatedProperties) {
-    concats = concats ? concats.concat(props.concatenatedProperties) : props.concatenatedProperties;
+  concats = values[concatProp] || base[concatProp];
+  if (props[concatProp]) {
+    concats = concats ? concats.concat(props[concatProp]) : props[concatProp];
   }
 
   return concats;
@@ -6269,7 +6269,28 @@ function applyConcatenatedProperties(obj, key, value, values) {
   }
 }
 
-function addNormalizedProperty(base, key, value, meta, descs, values, concats) {
+function applyMergedProperties(obj, key, value, values) {
+  var baseValue = values[key] || obj[key];
+
+  if (!baseValue) { return value; }
+
+  var newBase = Ember.merge({}, baseValue);
+  for (var prop in value) {
+    if (!value.hasOwnProperty(prop)) { continue; }
+
+    var propValue = value[prop];
+    if (isMethod(propValue)) {
+      // TODO: support for Computed Properties, etc?
+      newBase[prop] = giveMethodSuper(obj, prop, propValue, baseValue, {});
+    } else {
+      newBase[prop] = propValue;
+    }
+  }
+
+  return newBase;
+}
+
+function addNormalizedProperty(base, key, value, meta, descs, values, concats, mergings) {
   if (value instanceof Ember.Descriptor) {
     if (value === REQUIRED && descs[key]) { return CONTINUE; }
 
@@ -6285,8 +6306,12 @@ function addNormalizedProperty(base, key, value, meta, descs, values, concats) {
     // impl super if needed...
     if (isMethod(value)) {
       value = giveMethodSuper(base, key, value, values, descs);
-    } else if ((concats && a_indexOf.call(concats, key) >= 0) || key === 'concatenatedProperties') {
+    } else if ((concats && a_indexOf.call(concats, key) >= 0) || 
+                key === 'concatenatedProperties' ||
+                key === 'mergedProperties') {
       value = applyConcatenatedProperties(base, key, value, values);
+    } else if ((mergings && a_indexOf.call(mergings, key) >= 0)) {
+      value = applyMergedProperties(base, key, value, values);
     }
 
     descs[key] = undefined;
@@ -6295,7 +6320,7 @@ function addNormalizedProperty(base, key, value, meta, descs, values, concats) {
 }
 
 function mergeMixins(mixins, m, descs, values, base, keys) {
-  var mixin, props, key, concats, meta;
+  var mixin, props, key, concats, mergings, meta;
 
   function removeKeys(keyName) {
     delete descs[keyName];
@@ -6311,12 +6336,13 @@ function mergeMixins(mixins, m, descs, values, base, keys) {
 
     if (props) {
       meta = Ember.meta(base);
-      concats = concatenatedProperties(props, values, base);
+      concats = concatenatedMixinProperties('concatenatedProperties', props, values, base);
+      mergings = concatenatedMixinProperties('mergedProperties', props, values, base);
 
       for (key in props) {
         if (!props.hasOwnProperty(key)) { continue; }
         keys.push(key);
-        addNormalizedProperty(base, key, props[key], meta, descs, values, concats);
+        addNormalizedProperty(base, key, props[key], meta, descs, values, concats, mergings);
       }
 
       // manually copy toString() because some JS engines do not enumerate it
@@ -6415,6 +6441,7 @@ function applyMixin(obj, mixins, partial) {
   // Go through all mixins and hashes passed in, and:
   //
   // * Handle concatenated properties
+  // * Handle merged properties
   // * Set up _super wrapping if necessary
   // * Set up computed property descriptors
   // * Copying `toString` in broken browsers
@@ -11960,8 +11987,6 @@ CoreObject.PrototypeMixin = Mixin.create({
     return this;
   },
 
-  isInstance: true,
-
   /**
     An overridable method called when objects are instantiated. By default,
     does nothing unless it is overridden during class definition.
@@ -15490,7 +15515,9 @@ Ember.EventDispatcher = Ember.Object.extend(/** @scope Ember.EventDispatcher.pro
 
     var handler = object[eventName];
     if (Ember.typeOf(handler) === 'function') {
-      result = handler.call(object, evt, view);
+      result = Ember.run(function() {
+        return handler.call(object, evt, view);
+      });
       // Do not preventDefault in eventManagers.
       evt.stopPropagation();
     }
@@ -15673,6 +15700,10 @@ Ember.CoreView = Ember.Object.extend(Ember.Evented, {
       return parent;
     }
   }).property('_parentView'),
+
+  _viewForYield: Ember.computed(function(){
+    return this;
+  }).property(),
 
   state: null,
 
@@ -16305,7 +16336,7 @@ class:
     },
     eventManager: Ember.Object.create({
       mouseEnter: function(event, view) {
-        // takes presedence over AView#mouseEnter
+        // takes precedence over AView#mouseEnter
       }
     })
   });
@@ -17061,6 +17092,7 @@ Ember.View = Ember.CoreView.extend(
     // Schedule the DOM element to be created and appended to the given
     // element after bindings have synchronized.
     this._insertElementLater(function() {
+      Ember.assert("You tried to append to (" + target + ") but that isn't in the DOM", Ember.$(target).length > 0);
       Ember.assert("You cannot append to an existing Ember.View. Consider using Ember.ContainerView instead.", !Ember.$(target).is('.ember-view') && !Ember.$(target).parents().is('.ember-view'));
       this.$().appendTo(target);
     });
@@ -17082,6 +17114,7 @@ Ember.View = Ember.CoreView.extend(
     @return {Ember.View} received
   */
   replaceIn: function(target) {
+    Ember.assert("You tried to replace in (" + target + ") but that isn't in the DOM", Ember.$(target).length > 0);
     Ember.assert("You cannot replace an existing Ember.View. Consider using Ember.ContainerView instead.", !Ember.$(target).is('.ember-view') && !Ember.$(target).parents().is('.ember-view'));
 
     this._insertElementLater(function() {
@@ -19320,12 +19353,23 @@ Ember.Component = Ember.View.extend(Ember.TargetActionSupport, {
     this._super();
     set(this, 'context', this);
     set(this, 'controller', this);
-    set(this, 'templateData', {keywords: {}});
+  },
+
+  // during render, isolate keywords
+  cloneKeywords: function() {
+    return {
+      view: this,
+      controller: this
+    };
   },
 
   targetObject: Ember.computed(function(key) {
     var parentView = get(this, '_parentView');
     return parentView ? get(parentView, 'controller') : null;
+  }).property('_parentView'),
+
+  _viewForYield: Ember.computed(function(){
+    return get(this, '_parentView') || this;
   }).property('_parentView'),
 
   /**
@@ -19339,8 +19383,8 @@ Ember.Component = Ember.View.extend(Ember.TargetActionSupport, {
     `"addItem"`, calling `sendAction()` would send the `addItem` action
     to the component's controller.
 
-    If you provide an argument to `sendAction()`, that key will be used to look
-    up the action name.
+    If you provide the `action` argument to `sendAction()`, that key will
+    be used to look up the action name.
 
     For example, if the component had a property `playing` with the value
     `didStartPlaying`, calling `sendAction('playing')` would send the
@@ -19354,10 +19398,34 @@ Ember.Component = Ember.View.extend(Ember.TargetActionSupport, {
     an `action` property defined, no action will be sent to the controller,
     nor will an exception be raised.
 
+    You can send a context object with the action by supplying the `context`
+    argument. The context will be supplied as the first argument in the
+    target's action method. Example:
+
+    ```javascript
+    App.MyTree = Ember.Component.extend({
+      click: function() {
+        this.sendAction('didClickTreeNode', this.get('node'));
+      }
+    });
+
+    App.CategoriesController = Ember.Controller.extend({
+      didClickCategory: function(category) {
+        //Do something with the node/category that was clicked
+      }
+    });
+    ```
+
+    ```handlebars
+    {{! categories.hbs}}
+    {{my-tree didClickTreeNode='didClickCategory'}}
+    ```
+
     @method sendAction
     @param [action] {String} the action to trigger
+    @param [context] {*} a context to send with the action
   */
-  sendAction: function(action) {
+  sendAction: function(action, context) {
     var actionName;
 
     // Send the default action
@@ -19369,12 +19437,12 @@ Ember.Component = Ember.View.extend(Ember.TargetActionSupport, {
       Ember.assert("The " + action + " action was triggered on the component " + this.toString() + ", but the action name (" + actionName + ") was not a string.", isNone(actionName) || typeof actionName === 'string');
     }
 
-
     // If no action name for that action could be found, just abort.
     if (actionName === undefined) { return; }
 
     this.triggerAction({
-      action: actionName
+      action: actionName,
+      actionContext: context
     });
   }
 });
@@ -20195,7 +20263,10 @@ if (Handlebars.compile) {
     var environment = new Ember.Handlebars.Compiler().compile(ast, options);
     var templateSpec = new Ember.Handlebars.JavaScriptCompiler().compile(environment, options, undefined, true);
 
-    return Ember.Handlebars.template(templateSpec);
+    var template = Ember.Handlebars.template(templateSpec);
+    template.isMethod = false; //Make sure we don't wrap templates with ._super
+      
+    return template;
   };
 }
 
@@ -22428,7 +22499,7 @@ Ember.Handlebars.registerHelper('unbound', function(property, fn) {
 var handlebarsGet = Ember.Handlebars.get, normalizePath = Ember.Handlebars.normalizePath;
 
 /**
-  `log` allows you to output the value of a value in the current rendering
+  `log` allows you to output the value of a variable in the current rendering
   context.
 
   ```handlebars
@@ -22988,7 +23059,7 @@ var get = Ember.get, set = Ember.set;
   @return {String} HTML string
 */
 Ember.Handlebars.registerHelper('yield', function(options) {
-  var currentView = options.data.view, view = currentView, template, contextObject;
+  var currentView = options.data.view, view = currentView;
 
   while (view && !get(view, 'layout')) {
     view = get(view, 'parentView');
@@ -22996,19 +23067,17 @@ Ember.Handlebars.registerHelper('yield', function(options) {
 
   Ember.assert("You called yield in a template that was not a layout", !!view);
 
-  template = get(view, 'template');
-
-  contextObject = Ember.Component.detectInstance(view) ?
-    (view._parentView || view) : view;
-
-  var keywords = contextObject.cloneKeywords();
+  var template    = get(view, 'template'),
+    contextView   = get(view, '_viewForYield'),
+    keywords      = contextView.cloneKeywords();
 
   currentView.appendChild(Ember.View, {
-    isVirtual: true,
-    tagName: '',
-    template: template,
-    context: get(contextObject, 'context'),
-    controller: get(contextObject, 'controller'),
+    isVirtual:    true,
+    isYield:      true,
+    tagName:      '',
+    template:     template,
+    context:      get(contextView, 'context'),
+    controller:   get(contextView, 'controller'),
     templateData: {keywords: keywords}
   });
 });
@@ -24947,12 +25016,12 @@ define("router",
 
       A Transition is a thennable (a promise-like object) that represents
       an attempt to transition to another route. It can be aborted, either
-      explicitly via `abort` or by attempting another transition while a 
+      explicitly via `abort` or by attempting another transition while a
       previous one is still underway. An aborted transition can also
-      be `retry()`d later. 
+      be `retry()`d later.
      */
 
-    function Transition(router, promise) { 
+    function Transition(router, promise) {
       this.router = router;
       this.promise = promise;
       this.data = {};
@@ -24976,9 +25045,9 @@ define("router",
         The Transition's internal promise. Calling `.then` on this property
         is that same as calling `.then` on the Transition object itself, but
         this property is exposed for when you want to pass around a
-        Transition's promise, but not the Transition object itself, since 
+        Transition's promise, but not the Transition object itself, since
         Transition object can be externally `abort`ed, while the promise
-        cannot. 
+        cannot.
        */
       promise: null,
 
@@ -24992,12 +25061,12 @@ define("router",
       data: null,
 
       /**
-        A standard promise hook that resolves if the transition 
+        A standard promise hook that resolves if the transition
         succeeds and rejects if it fails/redirects/aborts.
 
         Forwards to the internal `promise` property which you can
         use in situations where you want to pass around a thennable,
-        but not the Transition itself. 
+        but not the Transition itself.
 
         @param {Function} success
         @param {Function} failure
@@ -25008,18 +25077,18 @@ define("router",
 
       /**
         Aborts the Transition. Note you can also implicitly abort a transition
-        by initiating another transition while a previous one is underway. 
+        by initiating another transition while a previous one is underway.
        */
       abort: function() {
         if (this.isAborted) { return this; }
         log(this.router, this.sequence, this.targetName + ": transition was aborted");
         this.isAborted = true;
         this.router.activeTransition = null;
-        return this; 
+        return this;
       },
 
       /**
-        Retries a previously-aborted transition (making sure to abort the 
+        Retries a previously-aborted transition (making sure to abort the
         transition if it's still active). Returns a new transition that
         represents the new attempt to transition.
        */
@@ -25033,7 +25102,7 @@ define("router",
       },
 
       /**
-        Sets the URL-changing method to be employed at the end of a 
+        Sets the URL-changing method to be employed at the end of a
         successful transition. By default, a new Transition will just
         use `updateURL`, but passing 'replace' to this method will
         cause the URL to update using 'replaceWith' instead. Omitting
@@ -25066,12 +25135,12 @@ define("router",
       handlers for failed transitions.
      */
     Router.UnrecognizedURLError = function(message) {
-      this.message = (message || "UnrecognizedURLError"); 
+      this.message = (message || "UnrecognizedURLError");
       this.name = "UnrecognizedURLError";
     };
 
     Router.TransitionAborted = function(message) {
-      this.message = (message || "TransitionAborted"); 
+      this.message = (message || "TransitionAborted");
       this.name = "TransitionAborted";
     };
 
@@ -25238,8 +25307,8 @@ define("router",
               if (isParam(object)) {
                 var recogHandler = recogHandlers[i], name = recogHandler.names[0];
                 if (object.toString() !== this.currentParams[name]) { return false; }
-              } else if (handlerInfo.context !== object) { 
-                return false; 
+              } else if (handlerInfo.context !== object) {
+                return false;
               }
             }
           }
@@ -25270,7 +25339,7 @@ define("router",
      */
     function getMatchPoint(router, handlers, objects, inputParams) {
 
-      var matchPoint = handlers.length, 
+      var matchPoint = handlers.length,
           providedModels = {}, i,
           currentHandlerInfos = router.currentHandlerInfos || [],
           params = {},
@@ -25281,9 +25350,9 @@ define("router",
 
       objects = slice.call(objects);
       merge(params, inputParams);
-   
+
       for (i = handlers.length - 1; i >= 0; i--) {
-        var handlerObj = handlers[i], 
+        var handlerObj = handlers[i],
             handlerName = handlerObj.handler,
             oldHandlerInfo = currentHandlerInfos[i],
             hasChanged = false;
@@ -25321,7 +25390,7 @@ define("router",
               handlerParams[handlerName][name] = params[name] = params[name] || oldParams[name];
             }
           }
-        } 
+        }
 
         if (hasChanged) { matchPoint = i; }
       }
@@ -25347,9 +25416,9 @@ define("router",
         }
       } else if (activeTransition) {
         // Use model from previous transition attempt, preferably the resolved one.
-        return (paramName && activeTransition.providedModels[handlerName]) ||
-               activeTransition.resolvedModels[handlerName];
-      } 
+        return activeTransition.resolvedModels[handlerName] ||
+               (paramName && activeTransition.providedModels[handlerName]);
+      }
     }
 
     function isParam(object) {
@@ -25515,7 +25584,7 @@ define("router",
         if (handler.setup) { handler.setup(context); }
         checkAbort(transition);
       } catch(e) {
-        if (!(e instanceof Router.TransitionAborted)) { 
+        if (!(e instanceof Router.TransitionAborted)) {
           // Trigger the `error` event starting from this failed handler.
           trigger(currentHandlerInfos.concat(handlerInfo), true, ['error', e, transition]);
         }
@@ -25666,11 +25735,11 @@ define("router",
           currentHandlerInfos = router.currentHandlerInfos;
 
       // Check if there's already a transition underway.
-      if (router.activeTransition) { 
+      if (router.activeTransition) {
         if (transitionsIdentical(router.activeTransition, targetName, providedModelsArray)) {
           return router.activeTransition;
         }
-        router.activeTransition.abort(); 
+        router.activeTransition.abort();
         wasTransitioning = true;
       }
 
@@ -25706,7 +25775,7 @@ define("router",
 
           // Don't overwrite contexts / update URL if this was a noop transition.
           if (!currentHandlerInfos || !currentHandlerInfos.length ||
-              currentHandlerInfos.length !== matchPointResults.matchPoint) { 
+              currentHandlerInfos.length !== matchPointResults.matchPoint) {
             finalizeTransition(transition, handlerInfos);
           }
 
@@ -25738,8 +25807,8 @@ define("router",
       @private
 
       Accepts handlers in Recognizer format, either returned from
-      recognize() or handlersFor(), and returns unified 
-      `HandlerInfo`s. 
+      recognize() or handlersFor(), and returns unified
+      `HandlerInfo`s.
      */
     function generateHandlerInfos(router, recogHandlers) {
       var handlerInfos = [];
@@ -25801,7 +25870,7 @@ define("router",
       router.currentParams = params;
 
       var urlMethod = transition.urlMethod;
-      if (urlMethod) { 
+      if (urlMethod) {
         var url = router.recognizer.generate(handlerName, params);
 
         if (urlMethod === 'replace') {
@@ -25841,7 +25910,9 @@ define("router",
 
         // We're before the match point, so don't run any hooks,
         // just use the already resolved context from the handler.
-        transition.resolvedModels[handlerInfo.name] = handlerInfo.handler.context;
+        transition.resolvedModels[handlerInfo.name] =
+          transition.providedModels[handlerInfo.name] ||
+          handlerInfo.handler.context;
         return proceed();
       }
 
@@ -25876,12 +25947,12 @@ define("router",
 
         log(router, seq, handlerName + ": handling error: " + reason);
 
-        // An error was thrown / promise rejected, so fire an 
+        // An error was thrown / promise rejected, so fire an
         // `error` event from this handler info up to root.
         trigger(handlerInfos.slice(0, index + 1), true, ['error', reason, transition]);
 
-        if (handler.error) { 
-          handler.error(reason, transition); 
+        if (handler.error) {
+          handler.error(reason, transition);
         }
 
         // Propagate the original error.
@@ -25931,7 +26002,7 @@ define("router",
       Throws a TransitionAborted if the provided transition has been aborted.
      */
     function checkAbort(transition) {
-      if (transition.isAborted) { 
+      if (transition.isAborted) {
         log(transition.router, transition.sequence, "detected abort.");
         throw new Router.TransitionAborted();
       }
@@ -25961,7 +26032,7 @@ define("router",
     }
 
     /**
-      @private 
+      @private
      */
     function log(router, sequence, msg) {
 
@@ -26020,7 +26091,7 @@ define("router",
       // Use custom serialize if it exists.
       if (handler.serialize) {
         return handler.serialize(model, names);
-      } 
+      }
 
       if (names.length !== 1) { return; }
 
@@ -26564,9 +26635,42 @@ Ember.Route = Ember.Object.extend({
     from within a template and the application's current route is this route.
 
     Events can also be invoked from other parts of your application via `Route#send`
-    or `Controller#send`.
+    or `Controller#send`. 
 
-    The context of the event will be this route.
+    The `events` hash will inherit event handlers from
+    the `events` hash defined on extended Route parent classes
+    or mixins rather than just replace the entire hash, e.g.:
+
+    ```js
+    App.CanDisplayBanner = Ember.Mixin.create({
+      events: {
+        displayBanner: function(msg) {
+          // ...
+        }
+      }
+    });
+
+    App.WelcomeRoute = Ember.Route.extend(App.CanDisplayBanner, {
+      events: {
+        playMusic: function() {
+          // ...
+        }
+      }
+    });
+
+    // `WelcomeRoute`, when active, will be able to respond
+    // to both events, since the events hash is merged rather
+    // then replaced when extending mixins / parent classes.
+    this.send('displayBanner');
+    this.send('playMusic');
+    ```
+
+    It is also possible to call `this._super()` from within an
+    event handler if it overrides a handle defined on a parent
+    class or mixin.
+
+    Within a route's event handler, the value of the `this` context 
+    is the Route object.
 
     ## Bubbling
 
@@ -26674,6 +26778,8 @@ Ember.Route = Ember.Object.extend({
     @default null
   */
   events: null,
+
+  mergedProperties: ['events'],
 
   /**
     This hook is executed when the router completely exits this route. It is
@@ -26875,6 +26981,8 @@ Ember.Route = Ember.Object.extend({
     from this hook.
 
     @method afterModel
+    @param {Object} resolvedModel the value returned from `model`,
+      or its resolved value if it was a promise
     @param {Transition} transition
     @return {Promise} if the value returned from this hook is
       a promise, the transition will pause until the transition
@@ -26930,8 +27038,13 @@ Ember.Route = Ember.Object.extend({
 
     @method model
     @param {Object} params the parameters extracted from the URL
+    @param {Transition} transition
+    @return {Object|Promise} the model for this route. If
+      a promise is returned, the transition will pause until 
+      the promise resolves, and the resolved value of the promise
+      will be used as the model for this route.
   */
-  model: function(params, resolvedParentModels) {
+  model: function(params, transition) {
     var match, name, sawParams, value;
 
     for (var prop in params) {
@@ -28021,7 +28134,7 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
     }
 
     outletSource = options.data.view;
-    while (!(outletSource.get('template.isTop'))) {
+    while (!outletSource.get('template.isTop') || outletSource.isYield) {
       outletSource = outletSource.get('_parentView');
     }
 
@@ -28074,7 +28187,8 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
   */
   Ember.Handlebars.registerHelper('render', function(name, contextString, options) {
     Ember.assert("You must pass a template to render", arguments.length >= 2);
-    var container, router, controller, view, context, lookupOptions;
+    var contextProvided = arguments.length === 3,
+        container, router, controller, view, context, lookupOptions;
 
     if (arguments.length === 2) {
       options = contextString;
@@ -28090,7 +28204,7 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
     container = options.data.keywords.controller.container;
     router = container.lookup('router:main');
 
-    Ember.assert("You can only use the {{render}} helper once without a model object as its second argument, as in {{render \"post\" post}}.", context || !router || !router._lookupActiveView(name));
+    Ember.assert("You can only use the {{render}} helper once without a model object as its second argument, as in {{render \"post\" post}}.", contextProvided || !router || !router._lookupActiveView(name));
 
     view = container.lookup('view:' + name) || container.lookup('view:default');
 
@@ -28105,7 +28219,7 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
                       Ember.generateController(container, name, context);
     }
 
-    if (controller && context) {
+    if (controller && contextProvided) {
       controller.set('model', context);
     }
 
@@ -29839,6 +29953,7 @@ var Application = Ember.Application = Ember.Namespace.extend(Ember.DeferredMixin
     @method deferReadiness
   */
   deferReadiness: function() {
+    Ember.assert("You must call deferReadiness on an instance of Ember.Application", this instanceof Ember.Application);
     Ember.assert("You cannot defer readiness since the `ready()` hook has already been called.", this._readinessDeferrals > 0);
     this._readinessDeferrals++;
   },
@@ -29848,6 +29963,7 @@ var Application = Ember.Application = Ember.Namespace.extend(Ember.DeferredMixin
     @see {Ember.Application#deferReadiness}
   */
   advanceReadiness: function() {
+    Ember.assert("You must call advanceReadiness on an instance of Ember.Application", this instanceof Ember.Application);
     this._readinessDeferrals--;
 
     if (this._readinessDeferrals === 0) {
@@ -30188,6 +30304,7 @@ Ember.Application.reopenClass({
     container.normalize = normalize;
     container.resolver = resolverFor(namespace);
     container.describe = container.resolver.describe;
+    container.optionsForType('component', { singleton: false });
     container.optionsForType('view', { singleton: false });
     container.optionsForType('template', { instantiate: false });
     container.register('application:main', namespace, { instantiate: false });
