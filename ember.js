@@ -1,5 +1,5 @@
-// Version: v1.0.0-rc.7-9-g053c1cf
-// Last commit: 053c1cf (2013-08-15 07:59:46 -0700)
+// Version: v1.0.0-rc.7-15-g5856ae3
+// Last commit: 5856ae3 (2013-08-16 13:59:16 -0700)
 
 
 (function() {
@@ -156,8 +156,8 @@ Ember.deprecateFunc = function(message, func) {
 
 })();
 
-// Version: v1.0.0-rc.7-9-g053c1cf
-// Last commit: 053c1cf (2013-08-15 07:59:46 -0700)
+// Version: v1.0.0-rc.7-18-g2cc3d91
+// Last commit: 2cc3d91 (2013-08-19 13:32:34 -0700)
 
 
 (function() {
@@ -185,7 +185,6 @@ var define, requireModule;
     deps = mod.deps;
     callback = mod.callback;
     reified = [];
-    exports;
 
     for (var i=0, l=deps.length; i<l; i++) {
       if (deps[i] === 'exports') {
@@ -264,7 +263,18 @@ Ember.VERSION = '1.0.0-rc.7';
   @property ENV
   @type Hash
 */
-Ember.ENV = Ember.ENV || ('undefined' === typeof ENV ? {} : ENV);
+
+if ('undefined' === typeof ENV) {
+  exports.ENV = {};
+}
+
+// We disable the RANGE API by default for performance reasons
+if ('undefined' === typeof ENV.DISABLE_RANGE_API) {
+  ENV.DISABLE_RANGE_API = true;
+}
+
+
+Ember.ENV = Ember.ENV || ENV;
 
 Ember.config = Ember.config || {};
 
@@ -1093,6 +1103,7 @@ Ember.wrap = function(func, superFunc) {
   superWrapper.wrappedFunction = func;
   superWrapper.__ember_observes__ = func.__ember_observes__;
   superWrapper.__ember_observesBefore__ = func.__ember_observesBefore__;
+  superWrapper.__ember_listens__ = func.__ember_listens__;
 
   return superWrapper;
 };
@@ -1789,6 +1800,7 @@ Ember.getPath = Ember.deprecateFunc('getPath is deprecated since get now support
 var o_create = Ember.create,
     metaFor = Ember.meta,
     META_KEY = Ember.META_KEY,
+    a_slice = [].slice,
     /* listener flags */
     ONCE = 1, SUSPENDED = 2;
 
@@ -2147,6 +2159,31 @@ function listenersFor(obj, eventName) {
 
   return ret;
 }
+
+/**
+  Define a property as a function that should be executed when
+  a specified event or events are triggered.
+
+      var Job = Ember.Object.extend({
+        logCompleted: Ember.on('completed', function(){
+          console.log('Job completed!');
+        })
+      });
+      var job = Job.create();
+      Ember.sendEvent(job, 'completed'); // Logs "Job completed!"
+
+  @method on
+  @for Ember
+  @param {String} eventNames*
+  @param {Function} func
+  @return func
+*/
+Ember.on = function(){
+  var func = a_slice.call(arguments, -1)[0],
+      events = a_slice.call(arguments, 0, -1);
+  func.__ember_listens__ = events;
+  return func;
+};
 
 Ember.addListener = addListener;
 Ember.removeListener = removeListener;
@@ -6312,7 +6349,7 @@ function addNormalizedProperty(base, key, value, meta, descs, values, concats, m
     // impl super if needed...
     if (isMethod(value)) {
       value = giveMethodSuper(base, key, value, values, descs);
-    } else if ((concats && a_indexOf.call(concats, key) >= 0) || 
+    } else if ((concats && a_indexOf.call(concats, key) >= 0) ||
                 key === 'concatenatedProperties' ||
                 key === 'mergedProperties') {
       value = applyConcatenatedProperties(base, key, value, values);
@@ -6418,26 +6455,30 @@ function followAlias(obj, desc, m, descs, values) {
   return { desc: desc, value: value };
 }
 
-function updateObservers(obj, key, observer, observerKey, method) {
-  if ('function' !== typeof observer) { return; }
-
-  var paths = observer[observerKey];
+function updateObserversAndListeners(obj, key, observerOrListener, pathsKey, updateMethod) {
+  var paths = observerOrListener[pathsKey];
 
   if (paths) {
     for (var i=0, l=paths.length; i<l; i++) {
-      Ember[method](obj, paths[i], null, key);
+      Ember[updateMethod](obj, paths[i], null, key);
     }
   }
 }
 
-function replaceObservers(obj, key, observer) {
-  var prevObserver = obj[key];
+function replaceObserversAndListeners(obj, key, observerOrListener) {
+  var prev = obj[key];
 
-  updateObservers(obj, key, prevObserver, '__ember_observesBefore__', 'removeBeforeObserver');
-  updateObservers(obj, key, prevObserver, '__ember_observes__', 'removeObserver');
+  if ('function' === typeof prev) {
+    updateObserversAndListeners(obj, key, prev, '__ember_observesBefore__', 'removeBeforeObserver');
+    updateObserversAndListeners(obj, key, prev, '__ember_observes__', 'removeObserver');
+    updateObserversAndListeners(obj, key, prev, '__ember_listens__', 'removeListener');
+  }
 
-  updateObservers(obj, key, observer, '__ember_observesBefore__', 'addBeforeObserver');
-  updateObservers(obj, key, observer, '__ember_observes__', 'addObserver');
+  if ('function' === typeof observerOrListener) {
+    updateObserversAndListeners(obj, key, observerOrListener, '__ember_observesBefore__', 'addBeforeObserver');
+    updateObserversAndListeners(obj, key, observerOrListener, '__ember_observes__', 'addObserver');
+    updateObserversAndListeners(obj, key, observerOrListener, '__ember_listens__', 'addListener');
+  }
 }
 
 function applyMixin(obj, mixins, partial) {
@@ -6470,7 +6511,7 @@ function applyMixin(obj, mixins, partial) {
 
     if (desc === undefined && value === undefined) { continue; }
 
-    replaceObservers(obj, key, value);
+    replaceObserversAndListeners(obj, key, value);
     detectBinding(obj, key, value, m);
     defineProperty(obj, key, desc, value, m);
   }
@@ -8964,7 +9005,7 @@ if (Ember.EXTEND_PROTOTYPES === true || Ember.EXTEND_PROTOTYPES.Function) {
     });
     ```
 
-    See `Ember.Observable.observes`.
+    See `Ember.observes`.
 
     @method observes
     @for Function
@@ -8991,7 +9032,7 @@ if (Ember.EXTEND_PROTOTYPES === true || Ember.EXTEND_PROTOTYPES.Function) {
     });
     ```
 
-    See `Ember.Observable.observesBefore`.
+    See `Ember.observesBefore`.
 
     @method observesBefore
     @for Function
@@ -9001,6 +9042,32 @@ if (Ember.EXTEND_PROTOTYPES === true || Ember.EXTEND_PROTOTYPES.Function) {
     return this;
   };
 
+  /**
+    The `on` extension of Javascript's Function prototype is available
+    when `Ember.EXTEND_PROTOTYPES` or `Ember.EXTEND_PROTOTYPES.Function` is
+    true, which is the default.
+
+    You can listen for events simply by adding the `on` call to the end of
+    your method declarations in classes or mixins that you write. For example:
+
+    ```javascript
+    Ember.Mixin.create({
+      doSomethingWithElement: function() {
+        // Executes whenever the "didInsertElement" event fires
+      }.on('didInsertElement')
+    });
+    ```
+
+    See `Ember.on`.
+
+    @method on
+    @for Function
+  */
+  Function.prototype.on = function() {
+    var events = a_slice.call(arguments);
+    this.__ember_listens__ = events;
+    return this;
+  };
 }
 
 
@@ -11849,6 +11916,7 @@ var set = Ember.set, get = Ember.get,
     meta = Ember.meta,
     rewatch = Ember.rewatch,
     finishChains = Ember.finishChains,
+    sendEvent = Ember.sendEvent,
     destroy = Ember.destroy,
     schedule = Ember.run.schedule,
     Mixin = Ember.Mixin,
@@ -11879,7 +11947,7 @@ function makeCtor() {
     }
     o_defineProperty(this, GUID_KEY, undefinedDescriptor);
     o_defineProperty(this, '_super', undefinedDescriptor);
-    var m = meta(this);
+    var m = meta(this), proto = m.proto;
     m.proto = this;
     if (initMixins) {
       // capture locally so we can clear the closed over variable
@@ -11949,9 +12017,10 @@ function makeCtor() {
       }
     }
     finishPartial(this, m);
-    delete m.proto;
+    m.proto = proto;
     finishChains(this);
     this.init.apply(this, arguments);
+    sendEvent(this, "didInit");
   };
 
   Class.toString = Mixin.prototype.toString;
@@ -19558,9 +19627,10 @@ define("metamorph",
     var K = function() {},
         guid = 0,
         document = this.document,
+        disableRange = ('undefined' === typeof ENV ? {} : ENV).DISABLE_RANGE_API,
 
         // Feature-detect the W3C range API, the extended check is for IE9 which only partially supports ranges
-        supportsRange = document && ('createRange' in document) && (typeof Range !== 'undefined') && Range.prototype.createContextualFragment,
+        supportsRange = (!disableRange) && document && ('createRange' in document) && (typeof Range !== 'undefined') && Range.prototype.createContextualFragment,
 
         // Internet Explorer prior to 9 does not allow setting innerHTML if the first element
         // is a "zero-scope" element. This problem can be worked around by making
