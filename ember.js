@@ -158,8 +158,8 @@ Ember.deprecateFunc = function(message, func) {
 
 })();
 
-// Version: v1.0.0-rc.7-36-g1867108
-// Last commit: 1867108 (2013-08-23 14:18:05 -0700)
+// Version: v1.0.0-rc.7-59-g4048275
+// Last commit: 4048275 (2013-08-25 00:57:38 -0400)
 
 
 (function() {
@@ -2389,6 +2389,8 @@ var chainsWillChange = function(obj, keyName, m, arg) {
   nodes = nodes[keyName];
   if (!nodes) { return; }
 
+  nodes = nodes.slice();
+
   for(var i = 0, l = nodes.length; i < l; i++) {
     nodes[i].willChange(arg);
   }
@@ -2402,8 +2404,9 @@ var chainsDidChange = function(obj, keyName, m, arg) {
   nodes = nodes[keyName];
   if (!nodes) { return; }
 
-  // looping in reverse because the chainWatchers array can be modified inside didChange
-  for (var i = nodes.length - 1; i >= 0; i--) {
+  nodes = nodes.slice();
+
+  for(var i = 0, l = nodes.length; i < l; i++) {
     nodes[i].didChange(arg);
   }
 };
@@ -7621,6 +7624,7 @@ define("container",
       this.children = [];
 
       this.resolver = parent && parent.resolver || function() {};
+
       this.registry = new InheritingDict(parent && parent.registry);
       this.cache = new InheritingDict(parent && parent.cache);
       this.factoryCache = new InheritingDict(parent && parent.cache);
@@ -18029,7 +18033,7 @@ Ember.View = Ember.CoreView.extend(
     act as a child of the parent.
 
     @method createChildView
-    @param {Class} viewClass
+    @param {Class|String} viewClass
     @param {Hash} [attrs] Attributes to add
     @return {Ember.View} new instance
   */
@@ -18040,11 +18044,11 @@ Ember.View = Ember.CoreView.extend(
 
     attrs = attrs || {};
     attrs._parentView = this;
-    attrs.container = this.container;
 
     if (Ember.CoreView.detect(view)) {
       attrs.templateData = attrs.templateData || get(this, 'templateData');
 
+      attrs.container = this.container;
       view = view.create(attrs);
 
       // don't set the property on a virtual view, as they are invisible to
@@ -18052,14 +18056,24 @@ Ember.View = Ember.CoreView.extend(
       if (view.viewName) {
         set(get(this, 'concreteView'), view.viewName, view);
       }
+    } else if ('string' === typeof view) {
+      var fullName = 'view:' + view;
+      var View = this.container.lookupFactory(fullName);
+
+      Ember.assert("Could not find view: '" + fullName + "'", !!View);
+
+      attrs.templateData = get(this, 'templateData');
+      view = View.create(attrs);
     } else {
       Ember.assert('You must pass instance or subclass of View', view.isView);
+      attrs.container = this.container;
+
+      if (!get(view, 'templateData')) {
+        attrs.templateData = get(this, 'templateData');
+      }
 
       Ember.setProperties(view, attrs);
 
-      if (!get(view, 'templateData')) {
-        set(view, 'templateData', get(this, 'templateData'));
-      }
     }
 
     return view;
@@ -19507,17 +19521,20 @@ Ember.CollectionView = Ember.ContainerView.extend(/** @scope Ember.CollectionVie
     @param {Number} added number of object added to content
   */
   arrayDidChange: function(content, start, removed, added) {
-    var itemViewClass = get(this, 'itemViewClass'),
-        addedViews = [], view, item, idx, len;
-
-    if ('string' === typeof itemViewClass) {
-      itemViewClass = get(itemViewClass);
-    }
-
-    Ember.assert(fmt("itemViewClass must be a subclass of Ember.View, not %@", [itemViewClass]), Ember.View.detect(itemViewClass));
+    var addedViews = [], view, item, idx, len, itemViewClass,
+      emptyView;
 
     len = content ? get(content, 'length') : 0;
+
     if (len) {
+      itemViewClass = get(this, 'itemViewClass');
+
+      if ('string' === typeof itemViewClass) {
+        itemViewClass = get(itemViewClass) || itemViewClass;
+      }
+
+      Ember.assert(fmt("itemViewClass must be a subclass of Ember.View, not %@", [itemViewClass]), 'string' === typeof itemViewClass || Ember.View.detect(itemViewClass));
+
       for (idx = start; idx < start+added; idx++) {
         item = content.objectAt(idx);
 
@@ -19529,17 +19546,23 @@ Ember.CollectionView = Ember.ContainerView.extend(/** @scope Ember.CollectionVie
         addedViews.push(view);
       }
     } else {
-      var emptyView = get(this, 'emptyView');
+      emptyView = get(this, 'emptyView');
+
       if (!emptyView) { return; }
 
-      var isClass = Ember.CoreView.detect(emptyView);
+      if ('string' === typeof emptyView) {
+        emptyView = get(emptyView) || emptyView;
+      }
 
       emptyView = this.createChildView(emptyView);
       addedViews.push(emptyView);
       set(this, 'emptyView', emptyView);
 
-      if (isClass) { this._createdEmptyView = emptyView; }
+      if (Ember.CoreView.detect(emptyView)) {
+        this._createdEmptyView = emptyView;
+      }
     }
+
     this.replace(start, 0, addedViews);
   },
 
@@ -19547,9 +19570,11 @@ Ember.CollectionView = Ember.ContainerView.extend(/** @scope Ember.CollectionVie
     view = this._super(view, attrs);
 
     var itemTagName = get(view, 'tagName');
-    var tagName = (itemTagName === null || itemTagName === undefined) ? Ember.CollectionView.CONTAINER_MAP[get(this, 'tagName')] : itemTagName;
 
-    set(view, 'tagName', tagName);
+    if (itemTagName === null || itemTagName === undefined) {
+      itemTagName = Ember.CollectionView.CONTAINER_MAP[get(this, 'tagName')];
+      set(view, 'tagName', itemTagName);
+    }
 
     return view;
   }
@@ -24713,6 +24738,11 @@ Ember.Handlebars.bootstrap = function(ctx) {
       templateName = script.attr('data-template-name') || script.attr('id') || 'application',
       template = compile(script.html());
 
+    // Check if template of same name already exists
+    if (Ember.TEMPLATES[templateName] !== undefined) {
+      throw new Error('Template named "' + templateName  + '" already exists.');
+    }
+
     // For templates which have a name, we save them and then remove them from the DOM
     Ember.TEMPLATES[templateName] = template;
 
@@ -25587,7 +25617,7 @@ define("router",
         @param {Array[Object]} contexts
         @return {Object} a serialized parameter hash
       */
-      paramsForHandler: function(handlerName, callback) {
+      paramsForHandler: function(handlerName, contexts) {
         return paramsForHandler(this, handlerName, slice.call(arguments, 1));
       },
 
@@ -25628,7 +25658,7 @@ define("router",
 
               if (isParam(object)) {
                 var recogHandler = recogHandlers[i], name = recogHandler.names[0];
-                if (object.toString() !== this.currentParams[name]) { return false; }
+                if ("" + object !== this.currentParams[name]) { return false; }
               } else if (handlerInfo.context !== object) {
                 return false;
               }
@@ -26245,8 +26275,8 @@ define("router",
                            .then(handleAbort)
                            .then(afterModel)
                            .then(handleAbort)
-                           .then(proceed)
-                           .then(null, handleError);
+                           .then(null, handleError)
+                           .then(proceed);
 
       function handleAbort(result) {
         if (transition.isAborted) {
@@ -26272,10 +26302,6 @@ define("router",
         // An error was thrown / promise rejected, so fire an
         // `error` event from this handler info up to root.
         trigger(handlerInfos.slice(0, index + 1), true, ['error', reason, transition]);
-
-        if (handler.error) {
-          handler.error(reason, transition);
-        }
 
         // Propagate the original error.
         return RSVP.reject(reason);
@@ -26631,10 +26657,12 @@ Ember.Router = Ember.Object.extend({
     var appController = this.container.lookup('controller:application'),
         path = Ember.Router._routePath(infos);
 
-    if (!('currentPath' in appController)) {
-      defineProperty(appController, 'currentPath');
-    }
+    if (!('currentPath' in appController)) { defineProperty(appController, 'currentPath'); }
     set(appController, 'currentPath', path);
+
+    if (!('currentRouteName' in appController)) { defineProperty(appController, 'currentRouteName'); }
+    set(appController, 'currentRouteName', infos[infos.length - 1].name);
+
     this.notifyPropertyChange('url');
 
     if (get(this, 'namespace').LOG_TRANSITIONS) {
@@ -29754,7 +29782,7 @@ var get = Ember.get,
 
   ```javascript
   App = Ember.Application.create({
-    resolver: Ember.DefaultResolver.extend({
+    Resolver: Ember.DefaultResolver.extend({
       resolveTemplate: function(parsedName) {
         var resolvedTemplate = this._super(parsedName);
         if (resolvedTemplate) { return resolvedTemplate; }
@@ -29801,6 +29829,32 @@ Ember.DefaultResolver = Ember.Object.extend({
     @property namespace
   */
   namespace: null,
+
+  normalize: function(fullName) {
+    var split = fullName.split(':', 2),
+        type = split[0],
+        name = split[1];
+
+    Ember.assert("Tried to normalize a container name without a colon (:) in it. You probably tried to lookup a name that did not contain a type, a colon, and a name. A proper lookup name would be `view:post`.", split.length === 2);
+
+    if (type !== 'template') {
+      var result = name;
+
+      if (result.indexOf('.') > -1) {
+        result = result.replace(/\.(.)/g, function(m) { return m.charAt(1).toUpperCase(); });
+      }
+
+      if (name.indexOf('_') > -1) {
+        result = result.replace(/_(.)/g, function(m) { return m.charAt(1).toUpperCase(); });
+      }
+
+      return type + ':' + result;
+    } else {
+      return fullName;
+    }
+  },
+
+
   /**
     This method is called via the container's resolver method.
     It parses the provided `fullName` and then looks up and
@@ -30591,11 +30645,20 @@ var Application = Ember.Application = Ember.Namespace.extend(Ember.DeferredMixin
   ready: Ember.K,
 
   /**
+
+    @depercated Use 'Resolver' instead
     Set this to provide an alternate class to `Ember.DefaultResolver`
 
     @property resolver
   */
   resolver: null,
+
+  /**
+    Set this to provide an alternate class to `Ember.DefaultResolver`
+
+    @property resolver
+  */
+  Resolver: null,
 
   willDestroy: function() {
     Ember.BOOTED = false;
@@ -30653,9 +30716,9 @@ Ember.Application.reopenClass({
     Ember.Container.defaultContainer = new DeprecatedContainer(container);
 
     container.set = Ember.set;
-    container.normalize = normalize;
-    container.resolver = resolverFor(namespace);
-    container.describe = container.resolver.describe;
+    container.resolver  = resolverFor(namespace);
+    container.normalize = container.resolver.normalize;
+    container.describe  = container.resolver.describe;
     container.optionsForType('component', { singleton: false });
     container.optionsForType('view', { singleton: false });
     container.optionsForType('template', { instantiate: false });
@@ -30696,8 +30759,12 @@ Ember.Application.reopenClass({
   @return {*} the resolved value for a given lookup
 */
 function resolverFor(namespace) {
-  var resolverClass = namespace.get('resolver') || Ember.DefaultResolver;
-  var resolver = resolverClass.create({
+  if (namespace.get('resolver')) {
+    Ember.deprecate('Application.resolver is deprecated infavour of Application.Resolver', false);
+  }
+
+  var ResolverClass = namespace.get('resolver') || namespace.get('Resolver') || Ember.DefaultResolver;
+  var resolver = ResolverClass.create({
     namespace: namespace
   });
 
@@ -30709,31 +30776,16 @@ function resolverFor(namespace) {
     return resolver.lookupDescription(fullName);
   };
 
+  resolve.normalize = function(fullName) {
+    if (resolver.normalize) {
+      return resolver.normalize(fullName);
+    } else {
+      Ember.deprecate('The Resolver should now provide a \'normalize\' function', false);
+      return fullName;
+    }
+  };
+
   return resolve;
-}
-
-function normalize(fullName) {
-  var split = fullName.split(':', 2),
-      type = split[0],
-      name = split[1];
-
-  Ember.assert("Tried to normalize a container name without a colon (:) in it. You probably tried to lookup a name that did not contain a type, a colon, and a name. A proper lookup name would be `view:post`.", split.length === 2);
-
-  if (type !== 'template') {
-    var result = name;
-
-    if (result.indexOf('.') > -1) {
-      result = result.replace(/\.(.)/g, function(m) { return m.charAt(1).toUpperCase(); });
-    }
-
-    if (name.indexOf('_') > -1) {
-      result = result.replace(/_(.)/g, function(m) { return m.charAt(1).toUpperCase(); });
-    }
-
-    return type + ':' + result;
-  } else {
-    return fullName;
-  }
 }
 
 Ember.runLoadHooks('Ember.Application', Ember.Application);
@@ -30755,30 +30807,14 @@ Ember.runLoadHooks('Ember.Application', Ember.Application);
 */
 
 var get = Ember.get, set = Ember.set;
-var ControllersProxy = Ember.Object.extend({
-  controller: null,
-
-  unknownProperty: function(controllerName) {
-    var controller = get(this, 'controller'),
-      needs = get(controller, 'needs'),
-      container = controller.get('container'),
-      dependency;
-
-    for (var i=0, l=needs.length; i<l; i++) {
-      dependency = needs[i];
-      if (dependency === controllerName) {
-        return container.lookup('controller:' + controllerName);
-      }
-    }
-  }
-});
 
 function verifyDependencies(controller) {
   var needs = get(controller, 'needs'),
       container = get(controller, 'container'),
-      dependency, satisfied = true;
+      satisfied = true,
+      dependency, i, l;
 
-  for (var i=0, l=needs.length; i<l; i++) {
+  for (i=0, l=needs.length; i<l; i++) {
     dependency = needs[i];
     if (dependency.indexOf(':') === -1) {
       dependency = "controller:" + dependency;
@@ -30790,6 +30826,19 @@ function verifyDependencies(controller) {
     }
   }
 
+  if (l > 0) {
+    set(controller, 'controllers', {
+      unknownProperty: function(controllerName) {
+        var dependency, i, l;
+        for (i=0, l=needs.length; i<l; i++) {
+          dependency = needs[i];
+          if (dependency === controllerName) {
+            return container.lookup('controller:' + controllerName);
+          }
+        }
+      }
+    });
+  }
   return satisfied;
 }
 
@@ -30838,9 +30887,7 @@ Ember.ControllerMixin.reopen({
     return Ember.controllerFor(get(this, 'container'), controllerName);
   },
 
-  controllers: Ember.computed(function() {
-    return ControllersProxy.create({ controller: this });
-  })
+  controllers: null
 });
 
 })();
