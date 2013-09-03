@@ -1,5 +1,5 @@
-// Version: v1.0.0-5-g0e9a65d
-// Last commit: 0e9a65d (2013-09-01 08:30:08 -0700)
+// Version: v1.0.0-3-g912e5d3
+// Last commit: 912e5d3 (2013-09-02 10:26:46 -0400)
 
 
 (function() {
@@ -170,8 +170,8 @@ if (!Ember.testing) {
 
 })();
 
-// Version: v1.0.0-5-g0e9a65d
-// Last commit: 0e9a65d (2013-09-01 08:30:08 -0700)
+// Version: v1.0.0-3-g912e5d3
+// Last commit: 912e5d3 (2013-09-02 10:26:46 -0400)
 
 
 (function() {
