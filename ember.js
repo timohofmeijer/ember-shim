@@ -1,15 +1,5 @@
-// ==========================================================================
-// Project:   Ember - JavaScript Application Framework
-// Copyright: ©2011-2013 Tilde Inc. and contributors
-//            Portions ©2006-2011 Strobe Inc.
-//            Portions ©2008-2011 Apple Inc. All rights reserved.
-// License:   Licensed under MIT license
-//            See https://raw.github.com/emberjs/ember.js/master/LICENSE
-// ==========================================================================
-
-
-// Version: v1.0.0-115-g6d41e76
-// Last commit: 6d41e76 (2013-09-16 11:48:41 -0700)
+// Version: v1.1.0-beta.1-3-g5ee0fa4
+// Last commit: 5ee0fa4 (2013-09-16 00:41:55 -0700)
 
 
 (function() {
@@ -180,18 +170,8 @@ if (!Ember.testing) {
 
 })();
 
-// ==========================================================================
-// Project:   Ember - JavaScript Application Framework
-// Copyright: ©2011-2013 Tilde Inc. and contributors
-//            Portions ©2006-2011 Strobe Inc.
-//            Portions ©2008-2011 Apple Inc. All rights reserved.
-// License:   Licensed under MIT license
-//            See https://raw.github.com/emberjs/ember.js/master/LICENSE
-// ==========================================================================
-
-
-// Version: v1.0.0-115-g6d41e76
-// Last commit: 6d41e76 (2013-09-16 11:48:41 -0700)
+// Version: v1.1.0-beta.1-3-g5ee0fa4
+// Last commit: 5ee0fa4 (2013-09-16 00:41:55 -0700)
 
 
 (function() {
@@ -325,15 +305,12 @@ Ember.FEATURES = {};
   Test that a feature is enabled. Parsed by Ember's build tools to leave
   experimental features out of beta/stable builds.
 
-  You can define an `ENV.ENABLE_ALL_FEATURES` config to force all features to
-  be enabled.
-
   @method isEnabled
   @param {string} feature
 */
 
 Ember.FEATURES.isEnabled = function(feature) {
-  return Ember.ENV.ENABLE_ALL_FEATURES || Ember.FEATURES[feature];
+  return Ember.FEATURES[feature];
 };
 
 // ..........................................................
@@ -2051,6 +2028,7 @@ Ember.getWithDefault = function(root, key, defaultValue) {
 
 
 Ember.get = get;
+Ember.getPath = Ember.deprecateFunc('getPath is deprecated since get now supports paths', Ember.get);
 
 })();
 
@@ -2889,6 +2867,7 @@ function setPath(root, path, value, tolerant) {
 }
 
 Ember.set = set;
+Ember.setPath = Ember.deprecateFunc('setPath is deprecated since set now supports paths', Ember.set);
 
 /**
   Error-tolerant form of `Ember.set`. Will not blow up if any part of the
@@ -2906,6 +2885,7 @@ Ember.set = set;
 Ember.trySet = function(root, path, value) {
   return set(root, path, value, true);
 };
+Ember.trySetPath = Ember.deprecateFunc('trySetPath has been renamed to trySet', Ember.trySet);
 
 })();
 
@@ -4834,7 +4814,7 @@ registerComputed('match', function(dependentKey, regexp) {
   var hampster = Hampster.create();
   hampster.get('napTime'); // false
   hampster.set('state', 'sleepy');
-  hampster.get('napTime'); // true
+  hampster.get('napTime'); // false
   hampster.set('state', 'hungry');
   hampster.get('napTime'); // false
   ```
@@ -8720,7 +8700,7 @@ define("container",
         @method makeToString
 
         @param {any} factory
-        @param {string} fullName
+        @param {string} fullNae
         @return {function} toString function
       */
       makeToString: function(factory, fullName) {
@@ -10962,7 +10942,7 @@ Ember.Array = Ember.Mixin.create(Ember.Enumerable, /** @scope Ember.Array.protot
 
 
 (function() {
-var e_get = Ember.get,
+var get = Ember.get,
     set = Ember.set,
     guidFor = Ember.guidFor,
     metaFor = Ember.meta,
@@ -10978,16 +10958,6 @@ var e_get = Ember.get,
     // testing, but there's no particular reason why it should be disallowed.
     eachPropertyPattern = /^(.*)\.@each\.(.*)/,
     doubleEachPropertyPattern = /(.*\.@each){2,}/;
-
-function get(obj, key) {
-  if (Ember.FEATURES.isEnabled('reduceComputedSelf')) {
-    if (key === '@self') {
-      return obj;
-    }
-  }
-
-  return e_get(obj, key);
-}
 
 /*
   Tracks changes to dependent arrays, as well as to properties of items in
@@ -11621,37 +11591,6 @@ ReduceComputedProperty.prototype.property = function () {
   };
   ```
 
-  Dependent keys may refer to `@self` to observe changes to the object itself,
-  which must be array-like, rather than a property of the object.  This is
-  mostly useful for array proxies, to ensure objects are retrieved via
-  `objectAtContent`.  This is how you could sort items by properties defined on an item controller.
-
-  Example
-
-  ```javascript
-  App.PeopleController = Ember.ArrayController.extend({
-    itemController: 'person',
-
-    sortedPeople: Ember.computed.sort('@self.@each.reversedName', function(personA, personB) {
-      // `reversedName` isn't defined on Person, but we have access to it via
-      // the item controller App.PersonController.  If we'd used
-      // `content.@each.reversedName` above, we would be getting the objects
-      // directly and not have access to `reversedName`.
-      //
-      var reversedNameA = get(personA, 'reversedName'),
-          reversedNameB = get(personB, 'reversedName');
-
-      return Ember.compare(reversedNameA, reversedNameB);
-    })
-  });
-
-  App.PersonController = Ember.ObjectController.extend({
-    reversedName: function () {
-      return reverse(get(this, 'name'));
-    }.property('name')
-  })
-  ```
-
   @method reduceComputed
   @for Ember
   @param {String} [dependentKeys*]
@@ -12017,15 +11956,16 @@ Ember.computed.map = function(dependentKey, callback) {
 
   ```javascript
   App.Person = Ember.Object.extend({
-    childAges: Ember.computed.mapBy('children', 'age')
+    childAges: Ember.computed.mapBy('children', 'age'),
+    minChildAge: Ember.computed.min('childAges')
   });
 
   var lordByron = App.Person.create({children: []});
-  lordByron.get('childAges'); // []
+  lordByron.get('childAge'); // []
   lordByron.get('children').pushObject({name: 'Augusta Ada Byron', age: 7});
-  lordByron.get('childAges'); // [7]
+  lordByron.get('childAge'); // [7]
   lordByron.get('children').pushObjects([{name: 'Allegra Byron', age: 5}, {name: 'Elizabeth Medora Leigh', age: 8}]);
-  lordByron.get('childAges'); // [7, 5, 8]
+  lordByron.get('childAge'); // [7, 5, 8]
   ```
 
   @method computed.mapBy
@@ -14183,6 +14123,29 @@ Ember.Observable = Ember.Mixin.create({
   */
   hasObserverFor: function(key) {
     return Ember.hasListeners(this, key+':change');
+  },
+
+  /**
+    @deprecated
+    @method getPath
+    @param {String} path The property path to retrieve
+    @return {Object} The property value or undefined.
+  */
+  getPath: function(path) {
+    Ember.deprecate("getPath is deprecated since get now supports paths");
+    return this.get(path);
+  },
+
+  /**
+    @deprecated
+    @method setPath
+    @param {String} path The path to the property that will be set
+    @param {Object} value The value to set or `null`.
+    @return {Ember.Observable}
+  */
+  setPath: function(path, value) {
+    Ember.deprecate("setPath is deprecated since set now supports paths");
+    return this.set(path, value);
   },
 
   /**
@@ -24081,6 +24044,7 @@ var handlebarsGet = Ember.Handlebars.get = function(root, path, options) {
   }
   return value;
 };
+Ember.Handlebars.getPath = Ember.deprecateFunc('`Ember.Handlebars.getPath` has been changed to `Ember.Handlebars.get` for consistency.', Ember.Handlebars.get);
 
 Ember.Handlebars.resolveParams = function(context, params, options) {
   var resolvedParams = [], types = options.types, param, type;
@@ -27019,7 +26983,7 @@ var get = Ember.get, set = Ember.set;
 Ember.TextSupport = Ember.Mixin.create({
   value: "",
 
-  attributeBindings: ['placeholder', 'disabled', 'maxlength', 'tabindex', 'readonly'],
+  attributeBindings: ['placeholder', 'disabled', 'maxlength', 'tabindex'],
   placeholder: null,
   disabled: false,
   maxlength: null,
@@ -28216,7 +28180,6 @@ function normalizeHash(hash, hashTypes) {
 * `indeterminate`
 * `name`
 
-
   When set to a quoted string, these values will be directly applied to the HTML
   element. When left unquoted, these values will be bound to a property on the
   template's current rendering context (most typically a controller instance).
@@ -28682,7 +28645,7 @@ define("route-recognizer",
           results.push(new StarSegment(match[1]));
           names.push(match[1]);
           types.stars++;
-        } else if(segment === "") {
+        } else if (segment === "") {
           results.push(new EpsilonSegment());
         } else {
           results.push(new StaticSegment(segment));
@@ -28831,31 +28794,19 @@ define("route-recognizer",
       return nextStates;
     }
 
-    function findHandler(state, path, queryParams) {
+    function findHandler(state, path) {
       var handlers = state.handlers, regex = state.regex;
       var captures = path.match(regex), currentCapture = 1;
       var result = [];
 
       for (var i=0, l=handlers.length; i<l; i++) {
-        var handler = handlers[i], names = handler.names, params = {},
-          watchedQueryParams = handler.queryParams || [],
-          activeQueryParams = {},
-          j, m;
+        var handler = handlers[i], names = handler.names, params = {};
 
-        for (j=0, m=names.length; j<m; j++) {
+        for (var j=0, m=names.length; j<m; j++) {
           params[names[j]] = captures[currentCapture++];
         }
-        for (j=0, m=watchedQueryParams.length; j < m; j++) {
-          var key = watchedQueryParams[j];
-          if(queryParams[key]){
-            activeQueryParams[key] = queryParams[key];
-          }
-        }
-        var currentResult = { handler: handler.handler, params: params, isDynamic: !!names.length };
-        if(watchedQueryParams && watchedQueryParams.length > 0) {
-          currentResult.queryParams = activeQueryParams;
-        }
-        result.push(currentResult);
+
+        result.push({ handler: handler.handler, params: params, isDynamic: !!names.length });
       }
 
       return result;
@@ -28910,11 +28861,7 @@ define("route-recognizer",
             regex += segment.regex();
           }
 
-          var handler = { handler: route.handler, names: names };
-          if(route.queryParams) {
-            handler.queryParams = route.queryParams;
-          }
-          handlers.push(handler);
+          handlers.push({ handler: route.handler, names: names });
         }
 
         if (isEmpty) {
@@ -28966,61 +28913,12 @@ define("route-recognizer",
 
         if (output.charAt(0) !== '/') { output = '/' + output; }
 
-        if (params && params.queryParams) {
-          output += this.generateQueryString(params.queryParams, route.handlers);
-        }
-
         return output;
-      },
-
-      generateQueryString: function(params, handlers) {
-        var pairs = [], allowedParams = [];
-        for(var i=0; i < handlers.length; i++) {
-          var currentParamList = handlers[i].queryParams;
-          if(currentParamList) {
-            allowedParams.push.apply(allowedParams, currentParamList);
-          }
-        }
-        for(var key in params) {
-          if (params.hasOwnProperty(key)) {
-            if(!~allowedParams.indexOf(key)) {
-              throw 'Query param "' + key + '" is not specified as a valid param for this route';
-            }
-            var value = params[key];
-            var pair = encodeURIComponent(key);
-            if(value !== true) {
-              pair += "=" + encodeURIComponent(value);
-            }
-            pairs.push(pair);
-          }
-        }
-
-        if (pairs.length === 0) { return ''; }
-
-        return "?" + pairs.join("&");
-      },
-
-      parseQueryString: function(queryString) {
-        var pairs = queryString.split("&"), queryParams = {};
-        for(var i=0; i < pairs.length; i++) {
-          var pair      = pairs[i].split('='),
-              key       = decodeURIComponent(pair[0]),
-              value     = pair[1] ? decodeURIComponent(pair[1]) : true;
-          queryParams[key] = value;
-        }
-        return queryParams;
       },
 
       recognize: function(path) {
         var states = [ this.rootState ],
-            pathLen, i, l, queryStart, queryParams = {};
-
-        queryStart = path.indexOf('?');
-        if (~queryStart) {
-          var queryString = path.substr(queryStart + 1, path.length);
-          path = path.substr(0, queryStart);
-          queryParams = this.parseQueryString(queryString);
-        }
+            pathLen, i, l;
 
         // DEBUG GROUP path
 
@@ -29048,7 +28946,7 @@ define("route-recognizer",
         var state = solutions[0];
 
         if (state && state.handlers) {
-          return findHandler(state, path, queryParams);
+          return findHandler(state, path);
         }
       }
     };
@@ -29073,35 +28971,18 @@ define("route-recognizer",
           if (callback.length === 0) { throw new Error("You must have an argument in the function passed to `to`"); }
           this.matcher.addChild(this.path, target, callback, this.delegate);
         }
-        return this;
-      },
-
-      withQueryParams: function() {
-        if (arguments.length === 0) { throw new Error("you must provide arguments to the withQueryParams method"); }
-        for (var i = 0; i < arguments.length; i++) {
-          if (typeof arguments[i] !== "string") {
-            throw new Error('you should call withQueryParams with a list of strings, e.g. withQueryParams("foo", "bar")');
-          }
-        }
-        var queryParams = [].slice.call(arguments);
-        this.matcher.addQueryParams(this.path, queryParams);
       }
     };
 
     function Matcher(target) {
       this.routes = {};
       this.children = {};
-      this.queryParams = {};
       this.target = target;
     }
 
     Matcher.prototype = {
       add: function(path, handler) {
         this.routes[path] = handler;
-      },
-
-      addQueryParams: function(path, params) {
-        this.queryParams[path] = params;
       },
 
       addChild: function(path, target, callback, delegate) {
@@ -29130,26 +29011,23 @@ define("route-recognizer",
       };
     }
 
-    function addRoute(routeArray, path, handler, queryParams) {
+    function addRoute(routeArray, path, handler) {
       var len = 0;
       for (var i=0, l=routeArray.length; i<l; i++) {
         len += routeArray[i].path.length;
       }
 
       path = path.substr(len);
-      var route = { path: path, handler: handler };
-      if(queryParams) { route.queryParams = queryParams; }
-      routeArray.push(route);
+      routeArray.push({ path: path, handler: handler });
     }
 
     function eachRoute(baseRoute, matcher, callback, binding) {
       var routes = matcher.routes;
-      var queryParams = matcher.queryParams;
 
       for (var path in routes) {
         if (routes.hasOwnProperty(path)) {
           var routeArray = baseRoute.slice();
-          addRoute(routeArray, path, routes[path], queryParams[path]);
+          addRoute(routeArray, path, routes[path]);
 
           if (matcher.children[path]) {
             eachRoute(routeArray, matcher.children[path], callback, binding);
@@ -29288,9 +29166,9 @@ define("router",
        */
       retry: function() {
         this.abort();
+
         var recogHandlers = this.router.recognizer.handlersFor(this.targetName),
-            handlerInfos  = generateHandlerInfosWithQueryParams(this.router, recogHandlers, this.queryParams),
-            newTransition = performTransition(this.router, handlerInfos, this.providedModelsArray, this.params, this.queryParams, this.data);
+            newTransition = performTransition(this.router, recogHandlers, this.providedModelsArray, this.params, this.data);
 
         return newTransition;
       },
@@ -29315,10 +29193,6 @@ define("router",
       method: function(method) {
         this.urlMethod = method;
         return this;
-      },
-
-      toString: function() {
-        return "Transition (sequence " + this.sequence + ")";
       }
     };
 
@@ -29463,21 +29337,8 @@ define("router",
         @param {Array[Object]} contexts
         @return {Object} a serialized parameter hash
       */
-
       paramsForHandler: function(handlerName, contexts) {
-        var partitionedArgs = extractQueryParams(slice.call(arguments, 1));
-        return paramsForHandler(this, handlerName, partitionedArgs[0], partitionedArgs[1]);
-      },
-
-      /**
-        This method takes a handler name and returns a list of query params
-        that are valid to pass to the handler or its parents
-
-        @param {String} handlerName
-        @return {Array[String]} a list of query parameters
-      */
-      queryParamsForHandler: function (handlerName) {
-        return queryParamsForHandler(this, handlerName);
+        return paramsForHandler(this, handlerName, slice.call(arguments, 1));
       },
 
       /**
@@ -29491,41 +29352,12 @@ define("router",
         @return {String} a URL
       */
       generate: function(handlerName) {
-        var partitionedArgs = extractQueryParams(slice.call(arguments, 1)),
-          suppliedParams = partitionedArgs[0],
-          queryParams = partitionedArgs[1];
-
-        var params = paramsForHandler(this, handlerName, suppliedParams, queryParams),
-          validQueryParams = queryParamsForHandler(this, handlerName);
-
-        var missingParams = [];
-
-        for (var key in queryParams) {
-          if (queryParams.hasOwnProperty(key) && !~validQueryParams.indexOf(key)) {
-            missingParams.push(key);
-          }
-        }
-
-        if (missingParams.length > 0) {
-          var err = 'You supplied the params ';
-          err += missingParams.map(function(param) {
-            return '"' + param + "=" + queryParams[param] + '"';
-          }).join(' and ');
-
-          err += ' which are not valid for the "' + handlerName + '" handler or its parents';
-
-          throw new Error(err);
-        }
-
+        var params = paramsForHandler(this, handlerName, slice.call(arguments, 1));
         return this.recognizer.generate(handlerName, params);
       },
 
       isActive: function(handlerName) {
-        var partitionedArgs   = extractQueryParams(slice.call(arguments, 1)),
-            contexts          = partitionedArgs[0],
-            queryParams       = partitionedArgs[1],
-            activeQueryParams  = {},
-            effectiveQueryParams = {};
+        var contexts = slice.call(arguments, 1);
 
         var targetHandlerInfos = this.targetHandlerInfos,
             found = false, names, object, handlerInfo, handlerObj;
@@ -29533,24 +29365,19 @@ define("router",
         if (!targetHandlerInfos) { return false; }
 
         var recogHandlers = this.recognizer.handlersFor(targetHandlerInfos[targetHandlerInfos.length - 1].name);
+
         for (var i=targetHandlerInfos.length-1; i>=0; i--) {
           handlerInfo = targetHandlerInfos[i];
           if (handlerInfo.name === handlerName) { found = true; }
 
           if (found) {
-            var recogHandler = recogHandlers[i];
+            if (contexts.length === 0) { break; }
 
-            merge(activeQueryParams, handlerInfo.queryParams);
-            if (queryParams !== false) {
-              merge(effectiveQueryParams, handlerInfo.queryParams);
-              mergeSomeKeys(effectiveQueryParams, queryParams, recogHandler.queryParams);
-            }
-
-            if (handlerInfo.isDynamic && contexts.length > 0) {
+            if (handlerInfo.isDynamic) {
               object = contexts.pop();
 
               if (isParam(object)) {
-                var name = recogHandler.names[0];
+                var recogHandler = recogHandlers[i], name = recogHandler.names[0];
                 if ("" + object !== this.currentParams[name]) { return false; }
               } else if (handlerInfo.context !== object) {
                 return false;
@@ -29559,8 +29386,7 @@ define("router",
           }
         }
 
-
-        return contexts.length === 0 && found && queryParamsEqual(activeQueryParams, effectiveQueryParams);
+        return contexts.length === 0 && found;
       },
 
       trigger: function(name) {
@@ -29583,7 +29409,7 @@ define("router",
       a shared pivot parent route and other data necessary to perform
       a transition.
      */
-    function getMatchPoint(router, handlers, objects, inputParams, queryParams) {
+    function getMatchPoint(router, handlers, objects, inputParams) {
 
       var matchPoint = handlers.length,
           providedModels = {}, i,
@@ -29638,12 +29464,6 @@ define("router",
           }
         }
 
-        // If there is an old handler, see if query params are the same. If there isn't an old handler,
-        // hasChanged will already be true here
-        if(oldHandlerInfo && !queryParamsEqual(oldHandlerInfo.queryParams, handlerObj.queryParams)) {
-            hasChanged = true;
-        }
-
         if (hasChanged) { matchPoint = i; }
       }
 
@@ -29677,28 +29497,6 @@ define("router",
       return (typeof object === "string" || object instanceof String || !isNaN(object));
     }
 
-
-
-    /**
-      @private
-
-      This method takes a handler name and returns a list of query params
-      that are valid to pass to the handler or its parents
-
-      @param {Router} router
-      @param {String} handlerName
-      @return {Array[String]} a list of query parameters
-    */
-    function queryParamsForHandler(router, handlerName) {
-      var handlers = router.recognizer.handlersFor(handlerName),
-        queryParams = [];
-
-      for (var i = 0; i < handlers.length; i++) {
-        queryParams.push.apply(queryParams, handlers[i].queryParams || []);
-      }
-
-      return queryParams;
-    }
     /**
       @private
 
@@ -29710,16 +29508,12 @@ define("router",
       @param {Array[Object]} objects
       @return {Object} a serialized parameter hash
     */
-    function paramsForHandler(router, handlerName, objects, queryParams) {
+    function paramsForHandler(router, handlerName, objects) {
 
       var handlers = router.recognizer.handlersFor(handlerName),
           params = {},
-          handlerInfos = generateHandlerInfosWithQueryParams(router, handlers, queryParams),
-          matchPoint = getMatchPoint(router, handlerInfos, objects).matchPoint,
-          mergedQueryParams = {},
+          matchPoint = getMatchPoint(router, handlers, objects).matchPoint,
           object, handlerObj, handler, names, i;
-
-      params.queryParams = {};
 
       for (i=0; i<handlers.length; i++) {
         handlerObj = handlers[i];
@@ -29739,13 +29533,7 @@ define("router",
           // Serialize to generate params
           merge(params, serialize(handler, object, names));
         }
-        if (queryParams !== false) {
-          mergeSomeKeys(params.queryParams, router.currentQueryParams, handlerObj.queryParams);
-          mergeSomeKeys(params.queryParams, queryParams, handlerObj.queryParams);
-        }
       }
-
-      if (queryParamsEqual(params.queryParams, {})) { delete params.queryParams; }
       return params;
     }
 
@@ -29755,84 +29543,24 @@ define("router",
       }
     }
 
-    function mergeSomeKeys(hash, other, keys) {
-      if (!other || !keys) { return; }
-      for(var i = 0; i < keys.length; i++) {
-        var key = keys[i], value;
-        if(other.hasOwnProperty(key)) {
-          value = other[key];
-          if(value === null || value === false || typeof value === "undefined") {
-            delete hash[key];
-          } else {
-            hash[key] = other[key];
-          }
-        }
-      }
-    }
-
-    /**
-      @private
-    */
-
-    function generateHandlerInfosWithQueryParams(router, handlers, queryParams) {
-      var handlerInfos = [];
-
-      for (var i = 0; i < handlers.length; i++) {
-        var handler = handlers[i],
-          handlerInfo = { handler: handler.handler, names: handler.names, context: handler.context, isDynamic: handler.isDynamic },
-          activeQueryParams = {};
-
-        if (queryParams !== false) {
-          mergeSomeKeys(activeQueryParams, router.currentQueryParams, handler.queryParams);
-          mergeSomeKeys(activeQueryParams, queryParams, handler.queryParams);
-        }
-
-        if (handler.queryParams && handler.queryParams.length > 0) {
-          handlerInfo.queryParams = activeQueryParams;
-        }
-
-        handlerInfos.push(handlerInfo);
-      }
-
-      return handlerInfos;
-    }
-
-    /**
-      @private
-    */
-    function createQueryParamTransition(router, queryParams) {
-      var currentHandlers = router.currentHandlerInfos,
-          currentHandler = currentHandlers[currentHandlers.length - 1],
-          name = currentHandler.name;
-
-      log(router, "Attempting query param transition");
-
-      return createNamedTransition(router, [name, queryParams]);
-    }
-
     /**
       @private
     */
     function createNamedTransition(router, args) {
-      var partitionedArgs     = extractQueryParams(args),
-        pureArgs              = partitionedArgs[0],
-        queryParams           = partitionedArgs[1],
-        handlers              = router.recognizer.handlersFor(pureArgs[0]),
-        handlerInfos          = generateHandlerInfosWithQueryParams(router, handlers, queryParams);
+      var handlers = router.recognizer.handlersFor(args[0]);
 
+      log(router, "Attempting transition to " + args[0]);
 
-      log(router, "Attempting transition to " + pureArgs[0]);
-
-      return performTransition(router, handlerInfos, slice.call(pureArgs, 1), router.currentParams, queryParams);
+      return performTransition(router, handlers, slice.call(args, 1), router.currentParams);
     }
 
     /**
       @private
     */
     function createURLTransition(router, url) {
+
       var results = router.recognizer.recognize(url),
-          currentHandlerInfos = router.currentHandlerInfos,
-          queryParams = {};
+          currentHandlerInfos = router.currentHandlerInfos;
 
       log(router, "Attempting URL transition to " + url);
 
@@ -29840,11 +29568,7 @@ define("router",
         return errorTransition(router, new Router.UnrecognizedURLError(url));
       }
 
-      for(var i = 0; i < results.length; i++) {
-        merge(queryParams, results[i].queryParams);
-      }
-
-      return performTransition(router, results, [], {}, queryParams);
+      return performTransition(router, results, [], {});
     }
 
 
@@ -29928,9 +29652,8 @@ define("router",
         checkAbort(transition);
 
         setContext(handler, context);
-        setQueryParams(handler, handlerInfo.queryParams);
 
-        if (handler.setup) { handler.setup(context, handlerInfo.queryParams); }
+        if (handler.setup) { handler.setup(context); }
         checkAbort(transition);
       } catch(e) {
         if (!(e instanceof Router.TransitionAborted)) {
@@ -29959,29 +29682,6 @@ define("router",
       for (var i=0, l=handlerInfos.length; i<l; i++) {
         callback(handlerInfos[i]);
       }
-    }
-
-    /**
-      @private
-
-      determines if two queryparam objects are the same or not
-    **/
-    function queryParamsEqual(a, b) {
-      a = a || {};
-      b = b || {};
-      var checkedKeys = [], key;
-      for(key in a) {
-        if (!a.hasOwnProperty(key)) { continue; }
-        if(b[key] !== a[key]) { return false; }
-        checkedKeys.push(key);
-      }
-      for(key in b) {
-        if (!b.hasOwnProperty(key)) { continue; }
-        if (~checkedKeys.indexOf(key)) { continue; }
-        // b has a key not in a
-        return false;
-      }
-      return true;
     }
 
     /**
@@ -30033,21 +29733,19 @@ define("router",
             unchanged: []
           };
 
-      var handlerChanged, contextChanged, queryParamsChanged, i, l;
+      var handlerChanged, contextChanged, i, l;
 
       for (i=0, l=newHandlers.length; i<l; i++) {
         var oldHandler = oldHandlers[i], newHandler = newHandlers[i];
 
         if (!oldHandler || oldHandler.handler !== newHandler.handler) {
           handlerChanged = true;
-        } else if (!queryParamsEqual(oldHandler.queryParams, newHandler.queryParams)) {
-          queryParamsChanged = true;
         }
 
         if (handlerChanged) {
           handlers.entered.push(newHandler);
           if (oldHandler) { handlers.exited.unshift(oldHandler); }
-        } else if (contextChanged || oldHandler.context !== newHandler.context || queryParamsChanged) {
+        } else if (contextChanged || oldHandler.context !== newHandler.context) {
           contextChanged = true;
           handlers.updatedContext.push(newHandler);
         } else {
@@ -30100,45 +29798,21 @@ define("router",
       if (handler.contextDidChange) { handler.contextDidChange(); }
     }
 
-    function setQueryParams(handler, queryParams) {
-      handler.queryParams = queryParams;
-      if (handler.queryParamsDidChange) { handler.queryParamsDidChange(); }
-    }
-
-
-    /**
-      @private
-
-      Extracts query params from the end of an array
-    **/
-
-    function extractQueryParams(array) {
-      var len = (array && array.length), head, queryParams;
-
-      if(len && len > 0 && array[len - 1] && array[len - 1].hasOwnProperty('queryParams')) {
-        queryParams = array[len - 1].queryParams;
-        head = slice.call(array, 0, len - 1);
-        return [head, queryParams];
-      } else {
-        return [array, null];
-      }
-    }
-
     /**
       @private
 
       Creates, begins, and returns a Transition.
      */
-    function performTransition(router, recogHandlers, providedModelsArray, params, queryParams, data) {
+    function performTransition(router, recogHandlers, providedModelsArray, params, data) {
 
-      var matchPointResults = getMatchPoint(router, recogHandlers, providedModelsArray, params, queryParams),
+      var matchPointResults = getMatchPoint(router, recogHandlers, providedModelsArray, params),
           targetName = recogHandlers[recogHandlers.length - 1].handler,
           wasTransitioning = false,
           currentHandlerInfos = router.currentHandlerInfos;
 
       // Check if there's already a transition underway.
       if (router.activeTransition) {
-        if (transitionsIdentical(router.activeTransition, targetName, providedModelsArray, queryParams)) {
+        if (transitionsIdentical(router.activeTransition, targetName, providedModelsArray)) {
           return router.activeTransition;
         }
         router.activeTransition.abort();
@@ -30153,7 +29827,6 @@ define("router",
       transition.providedModelsArray = providedModelsArray;
       transition.params = matchPointResults.params;
       transition.data = data || {};
-      transition.queryParams = queryParams;
       router.activeTransition = transition;
 
       var handlerInfos = generateHandlerInfos(router, recogHandlers);
@@ -30220,16 +29893,11 @@ define("router",
         var handlerObj = recogHandlers[i],
             isDynamic = handlerObj.isDynamic || (handlerObj.names && handlerObj.names.length);
 
-
-        var handlerInfo = {
+        handlerInfos.push({
           isDynamic: !!isDynamic,
           name: handlerObj.handler,
           handler: router.getHandler(handlerObj.handler)
-        };
-        if(handlerObj.queryParams) {
-          handlerInfo.queryParams = handlerObj.queryParams;
-        }
-        handlerInfos.push(handlerInfo);
+        });
       }
       return handlerInfos;
     }
@@ -30237,7 +29905,7 @@ define("router",
     /**
       @private
      */
-    function transitionsIdentical(oldTransition, targetName, providedModelsArray, queryParams) {
+    function transitionsIdentical(oldTransition, targetName, providedModelsArray) {
 
       if (oldTransition.targetName !== targetName) { return false; }
 
@@ -30247,11 +29915,6 @@ define("router",
       for (var i = 0, len = oldModels.length; i < len; ++i) {
         if (oldModels[i] !== providedModelsArray[i]) { return false; }
       }
-
-      if(!queryParamsEqual(oldTransition.queryParams, queryParams)) {
-        return false;
-      }
-
       return true;
     }
 
@@ -30265,12 +29928,11 @@ define("router",
 
       var router = transition.router,
           seq = transition.sequence,
-          handlerName = handlerInfos[handlerInfos.length - 1].name,
-          i;
+          handlerName = handlerInfos[handlerInfos.length - 1].name;
 
       // Collect params for URL.
       var objects = [], providedModels = transition.providedModelsArray.slice();
-      for (i = handlerInfos.length - 1; i>=0; --i) {
+      for (var i = handlerInfos.length - 1; i>=0; --i) {
         var handlerInfo = handlerInfos[i];
         if (handlerInfo.isDynamic) {
           var providedModel = providedModels.pop();
@@ -30278,17 +29940,9 @@ define("router",
         }
       }
 
-      var newQueryParams = {};
-      for (i = handlerInfos.length - 1; i>=0; --i) {
-        merge(newQueryParams, handlerInfos[i].queryParams);
-      }
-      router.currentQueryParams = newQueryParams;
-
-
-      var params = paramsForHandler(router, handlerName, objects, transition.queryParams);
+      var params = paramsForHandler(router, handlerName, objects);
 
       router.currentParams = params;
-
 
       var urlMethod = transition.urlMethod;
       if (urlMethod) {
@@ -30380,20 +30034,13 @@ define("router",
 
         log(router, seq, handlerName + ": calling beforeModel hook");
 
-        var args;
-
-        if (handlerInfo.queryParams) {
-          args = [handlerInfo.queryParams, transition];
-        } else {
-          args = [transition];
-        }
-
-        var p = handler.beforeModel && handler.beforeModel.apply(handler, args);
+        var p = handler.beforeModel && handler.beforeModel(transition);
         return (p instanceof Transition) ? null : p;
       }
 
       function model() {
         log(router, seq, handlerName + ": resolving model");
+
         var p = getModel(handlerInfo, transition, handlerParams[handlerName], index >= matchPoint);
         return (p instanceof Transition) ? null : p;
       }
@@ -30408,15 +30055,7 @@ define("router",
 
         transition.resolvedModels[handlerInfo.name] = context;
 
-        var args;
-
-        if (handlerInfo.queryParams) {
-          args = [context, handlerInfo.queryParams, transition];
-        } else {
-          args = [context, transition];
-        }
-
-        var p = handler.afterModel && handler.afterModel.apply(handler, args);
+        var p = handler.afterModel && handler.afterModel(context, transition);
         return (p instanceof Transition) ? null : p;
       }
 
@@ -30447,8 +30086,9 @@ define("router",
       or use one of the models provided to `transitionTo`.
      */
     function getModel(handlerInfo, transition, handlerParams, needsUpdate) {
+
       var handler = handlerInfo.handler,
-          handlerName = handlerInfo.name, args;
+          handlerName = handlerInfo.name;
 
       if (!needsUpdate && handler.hasOwnProperty('context')) {
         return handler.context;
@@ -30459,13 +30099,7 @@ define("router",
         return typeof providedModel === 'function' ? providedModel() : providedModel;
       }
 
-      if (handlerInfo.queryParams) {
-        args = [handlerParams || {}, handlerInfo.queryParams, transition];
-      } else {
-        args = [handlerParams || {}, transition, handlerInfo.queryParams];
-      }
-
-      return handler.model && handler.model.apply(handler, args);
+      return handler.model && handler.model(handlerParams || {}, transition);
     }
 
     /**
@@ -30498,12 +30132,10 @@ define("router",
       // Normalize blank transitions to root URL transitions.
       var name = args[0] || '/';
 
-      if(args.length === 1 && args[0].hasOwnProperty('queryParams')) {
-        return createQueryParamTransition(router, args[0]);
-      } else if (name.charAt(0) === '/') {
+      if (name.charAt(0) === '/') {
         return createURLTransition(router, name);
       } else {
-        return createNamedTransition(router, slice.call(args));
+        return createNamedTransition(router, args);
       }
     }
 
@@ -30581,17 +30213,17 @@ DSL.prototype = {
     if (callback) {
       var dsl = new DSL(name);
       callback.call(dsl);
-      this.push(options.path, name, dsl.generate(), options.queryParams);
+      this.push(options.path, name, dsl.generate());
     } else {
-      this.push(options.path, name, null, options.queryParams);
+      this.push(options.path, name);
     }
   },
 
-  push: function(url, name, callback, queryParams) {
+  push: function(url, name, callback) {
     var parts = name.split('.');
     if (url === "" || url === "/" || parts[parts.length-1] === "index") { this.explicitIndex = true; }
 
-    this.matches.push([url, name, callback, queryParams]);
+    this.matches.push([url, name, callback]);
   },
 
   route: function(name, options) {
@@ -30607,7 +30239,7 @@ DSL.prototype = {
       name = this.parent + "." + name;
     }
 
-    this.push(options.path, name, null, options.queryParams);
+    this.push(options.path, name);
   },
 
   generate: function() {
@@ -30620,12 +30252,7 @@ DSL.prototype = {
     return function(match) {
       for (var i=0, l=dslMatches.length; i<l; i++) {
         var dslMatch = dslMatches[i];
-        var matchObj = match(dslMatch[0]).to(dslMatch[1], dslMatch[2]);
-        if (Ember.FEATURES.isEnabled("query-params")) {
-          if(dslMatch[3]) {
-            matchObj.withQueryParams.apply(matchObj, dslMatch[3]);
-          }
-        }
+        match(dslMatch[0]).to(dslMatch[1], dslMatch[2]);
       }
     };
   }
@@ -30930,16 +30557,12 @@ Ember.Router = Ember.Object.extend({
     args = [].slice.call(args);
     args[0] = args[0] || '/';
 
-    var passedName = args[0], name, self = this,
-      isQueryParamsOnly = false;
+    var passedName = args[0], name, self = this;
 
-    if (Ember.FEATURES.isEnabled("query-params")) {
-      isQueryParamsOnly = (args.length === 1 && args[0].hasOwnProperty('queryParams'));
-    }
-
-    if (!isQueryParamsOnly && passedName.charAt(0) === '/') {
+    if (passedName.charAt(0) === '/') {
       name = passedName;
-    } else if (!isQueryParamsOnly) {
+    } else {
+
       if (!this.router.hasRoute(passedName)) {
         name = args[0] = passedName + '.index';
       } else {
@@ -31484,7 +31107,7 @@ Ember.Route = Ember.Object.extend(Ember.ActionHandler, {
 
     @method setup
   */
-  setup: function(context, queryParams) {
+  setup: function(context) {
     var controllerName = this.controllerName || this.routeName,
         controller = this.controllerFor(controllerName, true);
     if (!controller) {
@@ -31495,24 +31118,18 @@ Ember.Route = Ember.Object.extend(Ember.ActionHandler, {
     // referenced in action handlers
     this.controller = controller;
 
-    var args = [controller, context];
-
-    if (Ember.FEATURES.isEnabled("query-params")) {
-      args.push(queryParams);
-    }
-
     if (this.setupControllers) {
       Ember.deprecate("Ember.Route.setupControllers is deprecated. Please use Ember.Route.setupController(controller, model) instead.");
       this.setupControllers(controller, context);
     } else {
-      this.setupController.apply(this, args);
+      this.setupController(controller, context);
     }
 
     if (this.renderTemplates) {
       Ember.deprecate("Ember.Route.renderTemplates is deprecated. Please use Ember.Route.renderTemplate(controller, model) instead.");
       this.renderTemplates(context);
     } else {
-      this.renderTemplate.apply(this, args);
+      this.renderTemplate(controller, context);
     }
   },
 
@@ -31603,7 +31220,6 @@ Ember.Route = Ember.Object.extend(Ember.ActionHandler, {
 
     @method beforeModel
     @param {Transition} transition
-    @param {Object} queryParams the active query params for this route
     @return {Promise} if the value returned from this hook is
       a promise, the transition will pause until the transition
       resolves. Otherwise, non-promise return values are not
@@ -31637,13 +31253,12 @@ Ember.Route = Ember.Object.extend(Ember.ActionHandler, {
     @param {Object} resolvedModel the value returned from `model`,
       or its resolved value if it was a promise
     @param {Transition} transition
-    @param {Object} queryParams the active query params for this handler
     @return {Promise} if the value returned from this hook is
       a promise, the transition will pause until the transition
       resolves. Otherwise, non-promise return values are not
       utilized in any way.
    */
-  afterModel: function(resolvedModel, transition, queryParams) {
+  afterModel: function(resolvedModel, transition) {
     this.redirect(resolvedModel, transition);
   },
 
@@ -31703,7 +31318,6 @@ Ember.Route = Ember.Object.extend(Ember.ActionHandler, {
     @method model
     @param {Object} params the parameters extracted from the URL
     @param {Transition} transition
-    @param {Object} queryParams the query params for this route
     @return {Object|Promise} the model for this route. If
       a promise is returned, the transition will pause until
       the promise resolves, and the resolved value of the promise
@@ -32533,39 +32147,18 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
           Ember.Handlebars.normalizePath(templateContext, path, helperParameters.options.data);
         this.registerObserver(normalizedPath.root, normalizedPath.path, this, this._paramsChanged);
       }
-
-
-      if (Ember.FEATURES.isEnabled("query-params")) {
-        var queryParams = get(this, '_potentialQueryParams') || [];
-
-        for(i=0; i < queryParams.length; i++) {
-          this.registerObserver(this, queryParams[i], this, this._queryParamsChanged);
-        }
-      }
     },
 
     /**
       @private
 
       This method is invoked by observers installed during `init` that fire
-      whenever the params change
+      whenever the helpers
       @method _paramsChanged
      */
     _paramsChanged: function() {
       this.notifyPropertyChange('resolvedParams');
     },
-
-
-    /**
-      @private
-
-      This method is invoked by observers installed during `init` that fire
-      whenever the query params change
-     */
-    _queryParamsChanged: function (object, path) {
-      this.notifyPropertyChange('queryParams');
-    },
-
 
     /**
       @private
@@ -32702,6 +32295,7 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
       @return {Array} An array with the route name and any dynamic segments
      */
     routeArgs: Ember.computed(function() {
+
       var resolvedParams = get(this, 'resolvedParams').slice(0),
           router = get(this, 'router'),
           namedRoute = resolvedParams[0];
@@ -32721,43 +32315,8 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
         }
       }
 
-      if (Ember.FEATURES.isEnabled("query-params")) {
-        var queryParams = get(this, 'queryParams');
-
-        if (queryParams || queryParams === false) { resolvedParams.push({queryParams: queryParams}); }
-      }
-
       return resolvedParams;
-    }).property('resolvedParams', 'queryParams', 'router.url'),
-
-
-    _potentialQueryParams: Ember.computed(function () {
-      var namedRoute = get(this, 'resolvedParams')[0];
-      if (!namedRoute) { return null; }
-      var router          = get(this, 'router');
-
-      namedRoute = fullRouteName(router, namedRoute);
-
-      return router.router.queryParamsForHandler(namedRoute);
     }).property('resolvedParams'),
-
-    queryParams: Ember.computed(function () {
-      var self              = this,
-        queryParams         = null,
-        allowedQueryParams  = get(this, '_potentialQueryParams');
-
-      if (!allowedQueryParams) { return null; }
-      allowedQueryParams.forEach(function (param) {
-        var value = get(self, param);
-        if (typeof value !== 'undefined') {
-          queryParams = queryParams || {};
-          queryParams[param] = value;
-        }
-      });
-
-
-      return queryParams;
-    }).property('_potentialQueryParams.[]'),
 
     /**
       Sets the element's `href` attribute to the url for
@@ -32921,7 +32480,7 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
     ```javascript
     App.Router.map(function() {
       this.resource("photoGallery", {path: "hamster-photos/:photo_id"});
-    });
+    })
     ```
 
     ```handlebars
@@ -32963,34 +32522,6 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
       A+++ would snuggle again.
     </a>
     ```
-
-    ### Supplying an explicit dynamic segment value
-    If you don't have a model object available to pass to `{{link-to}}`,
-    an optional string or integer argument can be passed for routes whose
-    paths contain dynamic segments. This argument will become the value
-    of the dynamic segment:
-
-    ```javascript
-    App.Router.map(function() {
-      this.resource("photoGallery", {path: "hamster-photos/:photo_id"});
-    });
-    ```
-
-    ```handlebars
-    {{#link-to 'photoGallery' aPhotoId}}
-      {{aPhoto.title}}
-    {{/link-to}}
-    ```
-
-    ```html
-    <a href="/hamster-photos/42">
-      Tomster
-    </a>
-    ```
-
-    When transitioning into the linked route, the `model` hook will
-    be triggered with parameters including this passed identifier.
-
     ### Overriding attributes
     You can override any given property of the Ember.LinkView
     that is generated by the `{{link-to}}` helper by passing
@@ -33002,7 +32533,7 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
     {{/link-to}}
     ```
 
-    See [Ember.LinkView](/api/classes/Ember.LinkView.html) for a
+    See {{#crossLink "Ember.LinkView"}}{{/crossLink}} for a
     complete list of overrideable properties. Be sure to also
     check out inherited properties of `LinkView`.
 
@@ -33053,7 +32584,7 @@ Ember.onLoad('Ember.Handlebars', function(Handlebars) {
   });
 
   /**
-    See [link-to](/api/classes/Ember.Handlebars.helpers.html#method_link-to)
+    See `link-to`
 
     @method linkTo
     @for Ember.Handlebars.helpers
@@ -35371,15 +34902,13 @@ var Application = Ember.Application = Ember.Namespace.extend(Ember.DeferredMixin
     ```javascript
     App = Ember.Application.create();
 
-    App.Person  = Ember.Object.extend({});
-    App.Orange  = Ember.Object.extend({});
-    App.Email   = Ember.Object.extend({});
-    App.Session = Ember.Object.create({});
+    App.Person = Ember.Object.extend({});
+    App.Orange = Ember.Object.extend({});
+    App.Email  = Ember.Object.extend({});
 
     App.register('model:user', App.Person, {singleton: false });
     App.register('fruit:favorite', App.Orange);
     App.register('communication:main', App.Email, {singleton: false});
-    App.register('session', App.Session, {instantiate: false});
     ```
 
     @method register
@@ -35749,7 +35278,7 @@ Ember.Application.reopenClass({
 */
 function resolverFor(namespace) {
   if (namespace.get('resolver')) {
-    Ember.deprecate('Application.resolver is deprecated in favor of Application.Resolver', false);
+    Ember.deprecate('Application.resolver is deprecated infavour of Application.Resolver', false);
   }
 
   var ResolverClass = namespace.get('resolver') || namespace.get('Resolver') || Ember.DefaultResolver;
@@ -36657,7 +36186,7 @@ function testCheckboxClick(handler) {
     .css({ position: 'absolute', left: '-1000px', top: '-1000px' })
     .appendTo('body')
     .on('click', handler)
-    .trigger('click')
+    .click()
     .remove();
 }
 
