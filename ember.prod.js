@@ -1,3 +1,15 @@
+// ==========================================================================
+// Project:   Ember - JavaScript Application Framework
+// Copyright: Copyright 2011-2013 Tilde Inc. and contributors
+//            Portions Copyright 2006-2011 Strobe Inc.
+//            Portions Copyright 2008-2011 Apple Inc. All rights reserved.
+// License:   Licensed under MIT license
+//            See https://raw.github.com/emberjs/ember.js/master/LICENSE
+// ==========================================================================
+
+
+ // Version: 1.2.0-beta.1
+
 (function() {
 var define, requireModule;
 
@@ -61,7 +73,7 @@ var define, requireModule;
 
   @class Ember
   @static
-  @version 1.1.1+pre.8b569dfc
+  @version 1.2.0-beta.1
 */
 
 if ('undefined' === typeof Ember) {
@@ -88,10 +100,10 @@ Ember.toString = function() { return "Ember"; };
 /**
   @property VERSION
   @type String
-  @default '1.1.1+pre.8b569dfc'
+  @default '1.2.0-beta.1'
   @final
 */
-Ember.VERSION = '1.1.1+pre.8b569dfc';
+Ember.VERSION = '1.2.0-beta.1';
 
 /**
   Standard environmental variables. You can define these in a global `ENV`
@@ -119,22 +131,27 @@ Ember.config = Ember.config || {};
 /**
   Hash of enabled Canary features. Add to before creating your application.
 
+  You can also define `ENV.FEATURES` if you need to enable features flagged at runtime.
+
   @property FEATURES
   @type Hash
 */
 
-Ember.FEATURES = {};
+Ember.FEATURES = Ember.ENV.FEATURES || {};
 
 /**
   Test that a feature is enabled. Parsed by Ember's build tools to leave
   experimental features out of beta/stable builds.
+
+  You can define an `ENV.ENABLE_ALL_FEATURES` config to force all features to
+  be enabled.
 
   @method isEnabled
   @param {string} feature
 */
 
 Ember.FEATURES.isEnabled = function(feature) {
-  return Ember.FEATURES[feature];
+  return Ember.ENV.ENABLE_ALL_FEATURES || Ember.FEATURES[feature];
 };
 
 // ..........................................................
@@ -217,189 +234,6 @@ if ('undefined' === typeof Ember.deprecateFunc) {
   @private
 */
 Ember.uuid = 0;
-
-// ..........................................................
-// LOGGER
-//
-
-function consoleMethod(name) {
-  var consoleObj;
-  if (imports.console) {
-    consoleObj = imports.console;
-  } else if (typeof console !== 'undefined') {
-    consoleObj = console;
-  }
-
-  var method = typeof consoleObj === 'object' ? consoleObj[name] : null;
-
-  if (method) {
-    // Older IE doesn't support apply, but Chrome needs it
-    if (method.apply) {
-      return function() {
-        method.apply(consoleObj, arguments);
-      };
-    } else {
-      return function() {
-        var message = Array.prototype.join.call(arguments, ', ');
-        method(message);
-      };
-    }
-  }
-}
-
-function assertPolyfill(test, message) {
-  if (!test) {
-    try {
-      // attempt to preserve the stack
-      throw new Error("assertion failed: " + message);
-    } catch(error) {
-      setTimeout(function() {
-        throw error;
-      }, 0);
-    }
-  }
-}
-
-/**
-  Inside Ember-Metal, simply uses the methods from `imports.console`.
-  Override this to provide more robust logging functionality.
-
-  @class Logger
-  @namespace Ember
-*/
-Ember.Logger = {
-  /**
-   Logs the arguments to the console.
-   You can pass as many arguments as you want and they will be joined together with a space.
-
-    ```javascript
-    var foo = 1;
-    Ember.Logger.log('log value of foo:', foo); // "log value of foo: 1" will be printed to the console
-    ```
-
-   @method log
-   @for Ember.Logger
-   @param {*} arguments
-  */
-  log:   consoleMethod('log')   || Ember.K,
-  /**
-   Prints the arguments to the console with a warning icon.
-   You can pass as many arguments as you want and they will be joined together with a space.
-
-    ```javascript
-    Ember.Logger.warn('Something happened!'); // "Something happened!" will be printed to the console with a warning icon.
-    ```
-
-   @method warn
-   @for Ember.Logger
-   @param {*} arguments
-  */
-  warn:  consoleMethod('warn')  || Ember.K,
-  /**
-   Prints the arguments to the console with an error icon, red text and a stack race.
-   You can pass as many arguments as you want and they will be joined together with a space.
-
-    ```javascript
-    Ember.Logger.error('Danger! Danger!'); // "Danger! Danger!" will be printed to the console in red text.
-    ```
-
-   @method error
-   @for Ember.Logger
-   @param {*} arguments
-  */
-  error: consoleMethod('error') || Ember.K,
-  /**
-   Logs the arguments to the console.
-   You can pass as many arguments as you want and they will be joined together with a space.
-
-    ```javascript
-    var foo = 1;
-    Ember.Logger.info('log value of foo:', foo); // "log value of foo: 1" will be printed to the console
-    ```
-
-   @method info
-   @for Ember.Logger
-   @param {*} arguments
-  */
-  info:  consoleMethod('info')  || Ember.K,
-  /**
-   Logs the arguments to the console in blue text.
-   You can pass as many arguments as you want and they will be joined together with a space.
-
-    ```javascript
-    var foo = 1;
-    Ember.Logger.debug('log value of foo:', foo); // "log value of foo: 1" will be printed to the console
-    ```
-
-   @method debug
-   @for Ember.Logger
-   @param {*} arguments
-  */
-  debug: consoleMethod('debug') || consoleMethod('info') || Ember.K,
-  /**
-
-   If the value passed into Ember.Logger.assert is not truthy it will throw an error with a stack trace.
-
-    ```javascript
-    Ember.Logger.assert(true); // undefined
-    Ember.Logger.assert(true === false); // Throws an Assertion failed error.
-    ```
-
-   @method assert
-   @for Ember.Logger
-   @param {Boolean} bool Value to test
-  */
-  assert: consoleMethod('assert') || assertPolyfill
-};
-
-
-// ..........................................................
-// ERROR HANDLING
-//
-
-/**
-  A function may be assigned to `Ember.onerror` to be called when Ember
-  internals encounter an error. This is useful for specialized error handling
-  and reporting code.
-
-  ```javascript
-  Ember.onerror = function(error) {
-    Em.$.ajax('/report-error', 'POST', {
-      stack: error.stack,
-      otherInformation: 'whatever app state you want to provide'
-    });
-  };
-  ```
-
-  @event onerror
-  @for Ember
-  @param {Exception} error the error object
-*/
-Ember.onerror = null;
-
-/**
-  @private
-
-  Wrap code block in a try/catch if `Ember.onerror` is set.
-
-  @method handleErrors
-  @for Ember
-  @param {Function} func
-  @param [context]
-*/
-Ember.handleErrors = function(func, context) {
-  // Unfortunately in some browsers we lose the backtrace if we rethrow the existing error,
-  // so in the event that we don't have an `onerror` handler we don't wrap in a try/catch
-  if ('function' === typeof Ember.onerror) {
-    try {
-      return func.call(context || this);
-    } catch (error) {
-      Ember.onerror(error);
-    }
-  } else {
-    return func.call(context || this);
-  }
-};
 
 /**
   Merge the contents of two objects together into the first object.
@@ -749,9 +583,91 @@ if (Ember.SHIM_ES5) {
 
 
 (function() {
+var errorProps = ['description', 'fileName', 'lineNumber', 'message', 'name', 'number', 'stack'];
+
+/**
+  A subclass of the JavaScript Error object for use in Ember.
+
+  @class Error
+  @namespace Ember
+  @extends Error
+  @constructor
+*/
+Ember.Error = function() {
+  var tmp = Error.apply(this, arguments);
+
+  // Unfortunately errors are not enumerable in Chrome (at least), so `for prop in tmp` doesn't work.
+  for (var idx = 0; idx < errorProps.length; idx++) {
+    this[errorProps[idx]] = tmp[errorProps[idx]];
+  }
+};
+
+Ember.Error.prototype = Ember.create(Error.prototype);
+
+// ..........................................................
+// ERROR HANDLING
+//
+
+/**
+  A function may be assigned to `Ember.onerror` to be called when Ember
+  internals encounter an error. This is useful for specialized error handling
+  and reporting code.
+
+  ```javascript
+  Ember.onerror = function(error) {
+    Em.$.ajax('/report-error', 'POST', {
+      stack: error.stack,
+      otherInformation: 'whatever app state you want to provide'
+    });
+  };
+  ```
+
+  @event onerror
+  @for Ember
+  @param {Exception} error the error object
+*/
+Ember.onerror = null;
+
+/**
+  @private
+
+  Wrap code block in a try/catch if `Ember.onerror` is set.
+
+  @method handleErrors
+  @for Ember
+  @param {Function} func
+  @param [context]
+*/
+Ember.handleErrors = function(func, context) {
+  // Unfortunately in some browsers we lose the backtrace if we rethrow the existing error,
+  // so in the event that we don't have an `onerror` handler we don't wrap in a try/catch
+  if ('function' === typeof Ember.onerror) {
+    try {
+      return func.call(context || this);
+    } catch (error) {
+      Ember.onerror(error);
+    }
+  } else {
+    return func.call(context || this);
+  }
+};
+
+})();
+
+
+
+(function() {
 /**
 @module ember-metal
 */
+
+/**
+  @private
+  
+  Prefix used for guids through out Ember.
+  
+*/
+Ember.GUID_PREFIX = 'ember';
 
 
 var o_defineProperty = Ember.platform.defineProperty,
@@ -807,13 +723,13 @@ var GUID_DESC = {
   @return {String} the guid
 */
 Ember.generateGuid = function generateGuid(obj, prefix) {
-  if (!prefix) prefix = 'ember';
+  if (!prefix) prefix = Ember.GUID_PREFIX;
   var ret = (prefix + (uuid++));
   if (obj) {
     GUID_DESC.value = ret;
     o_defineProperty(obj, GUID_KEY, GUID_DESC);
   }
-  return ret ;
+  return ret;
 };
 
 /**
@@ -1810,7 +1726,7 @@ var normalizeTuple = Ember.normalizeTuple = function(target, path) {
   }
 
   // must return some kind of path to be valid else other things will break.
-  if (!path || path.length===0) throw new Error('Invalid Path');
+  if (!path || path.length===0) throw new Ember.Error('Invalid Path');
 
   return [ target, path ];
 };
@@ -1851,7 +1767,6 @@ Ember.getWithDefault = function(root, key, defaultValue) {
 
 
 Ember.get = get;
-Ember.getPath = Ember.deprecateFunc('getPath is deprecated since get now supports paths', Ember.get);
 
 })();
 
@@ -2676,19 +2591,18 @@ function setPath(root, path, value, tolerant) {
   }
 
   if (!keyName || keyName.length === 0) {
-    throw new Error('You passed an empty path');
+    throw new Ember.Error('You passed an empty path');
   }
 
   if (!root) {
     if (tolerant) { return; }
-    else { throw new Error('Object in path '+path+' could not be found or was destroyed.'); }
+    else { throw new Ember.Error('Object in path '+path+' could not be found or was destroyed.'); }
   }
 
   return set(root, keyName, value);
 }
 
 Ember.set = set;
-Ember.setPath = Ember.deprecateFunc('setPath is deprecated since set now supports paths', Ember.set);
 
 /**
   Error-tolerant form of `Ember.set`. Will not blow up if any part of the
@@ -2706,7 +2620,6 @@ Ember.setPath = Ember.deprecateFunc('setPath is deprecated since set now support
 Ember.trySet = function(root, path, value) {
   return set(root, path, value, true);
 };
-Ember.trySetPath = Ember.deprecateFunc('trySetPath has been renamed to trySet', Ember.trySet);
 
 })();
 
@@ -3086,6 +2999,142 @@ MapWithDefault.prototype.copy = function() {
     defaultValue: this.defaultValue
   }));
 };
+
+})();
+
+
+
+(function() {
+function consoleMethod(name) {
+  var consoleObj;
+  if (Ember.imports.console) {
+    consoleObj = Ember.imports.console;
+  } else if (typeof console !== 'undefined') {
+    consoleObj = console;
+  }
+
+  var method = typeof consoleObj === 'object' ? consoleObj[name] : null;
+
+  if (method) {
+    // Older IE doesn't support apply, but Chrome needs it
+    if (method.apply) {
+      return function() {
+        method.apply(consoleObj, arguments);
+      };
+    } else {
+      return function() {
+        var message = Array.prototype.join.call(arguments, ', ');
+        method(message);
+      };
+    }
+  }
+}
+
+function assertPolyfill(test, message) {
+  if (!test) {
+    try {
+      // attempt to preserve the stack
+      throw new Ember.Error("assertion failed: " + message);
+    } catch(error) {
+      setTimeout(function() {
+        throw error;
+      }, 0);
+    }
+  }
+}
+
+/**
+  Inside Ember-Metal, simply uses the methods from `imports.console`.
+  Override this to provide more robust logging functionality.
+
+  @class Logger
+  @namespace Ember
+*/
+Ember.Logger = {
+  /**
+   Logs the arguments to the console.
+   You can pass as many arguments as you want and they will be joined together with a space.
+
+    ```javascript
+    var foo = 1;
+    Ember.Logger.log('log value of foo:', foo); // "log value of foo: 1" will be printed to the console
+    ```
+
+   @method log
+   @for Ember.Logger
+   @param {*} arguments
+  */
+  log:   consoleMethod('log')   || Ember.K,
+  /**
+   Prints the arguments to the console with a warning icon.
+   You can pass as many arguments as you want and they will be joined together with a space.
+
+    ```javascript
+    Ember.Logger.warn('Something happened!'); // "Something happened!" will be printed to the console with a warning icon.
+    ```
+
+   @method warn
+   @for Ember.Logger
+   @param {*} arguments
+  */
+  warn:  consoleMethod('warn')  || Ember.K,
+  /**
+   Prints the arguments to the console with an error icon, red text and a stack race.
+   You can pass as many arguments as you want and they will be joined together with a space.
+
+    ```javascript
+    Ember.Logger.error('Danger! Danger!'); // "Danger! Danger!" will be printed to the console in red text.
+    ```
+
+   @method error
+   @for Ember.Logger
+   @param {*} arguments
+  */
+  error: consoleMethod('error') || Ember.K,
+  /**
+   Logs the arguments to the console.
+   You can pass as many arguments as you want and they will be joined together with a space.
+
+    ```javascript
+    var foo = 1;
+    Ember.Logger.info('log value of foo:', foo); // "log value of foo: 1" will be printed to the console
+    ```
+
+   @method info
+   @for Ember.Logger
+   @param {*} arguments
+  */
+  info:  consoleMethod('info')  || Ember.K,
+  /**
+   Logs the arguments to the console in blue text.
+   You can pass as many arguments as you want and they will be joined together with a space.
+
+    ```javascript
+    var foo = 1;
+    Ember.Logger.debug('log value of foo:', foo); // "log value of foo: 1" will be printed to the console
+    ```
+
+   @method debug
+   @for Ember.Logger
+   @param {*} arguments
+  */
+  debug: consoleMethod('debug') || consoleMethod('info') || Ember.K,
+  /**
+
+   If the value passed into Ember.Logger.assert is not truthy it will throw an error with a stack trace.
+
+    ```javascript
+    Ember.Logger.assert(true); // undefined
+    Ember.Logger.assert(true === false); // Throws an Assertion failed error.
+    ```
+
+   @method assert
+   @for Ember.Logger
+   @param {Boolean} bool Value to test
+  */
+  assert: consoleMethod('assert') || assertPolyfill
+};
+
 
 })();
 
@@ -3717,6 +3766,45 @@ Ember.finishChains = function(obj) {
 
 
 (function() {
+/**
+  @module ember-metal 
+*/
+
+var forEach = Ember.EnumerableUtils.forEach,
+    IS_BRACE_EXPANSION = /^\{([^.]*)\}$/;
+
+/**
+  Expands `pattern`, invoking `callback` for each expansion.
+
+  The only pattern supported is brace-expansion, anything else will be passed
+  once to `callback` directly.  Furthermore, brace-expansion is only applied to
+  the entire pattern, not to substrings.
+
+  Example
+  ```js
+  function echo(arg){ console.log(arg); }
+
+  Ember.expandProperties('foo.bar', echo);        //=> 'foo.bar'
+  Ember.expandProperties('{foo,bar}', echo);      //=> 'foo', 'bar'
+  Ember.expandProperties('foo.{bar,baz}', echo);  //=> 'foo.{bar,baz}'
+  ```
+
+  @method
+  @private
+  @param {string} pattern The property pattern to expand.
+  @param {function} callback The callback to invoke.  It is invoked once per
+  expansion, and is passed the expansion.
+*/
+Ember.expandProperties = function (pattern, callback) {
+  
+  callback(pattern);
+};
+
+})();
+
+
+
+(function() {
 var metaFor = Ember.meta, // utils.js
     typeOf = Ember.typeOf, // utils.js
     ChainNode = Ember._ChainNode; // chains.js
@@ -3770,6 +3858,7 @@ Ember.unwatchPath = function(obj, keyPath) {
 var metaFor = Ember.meta, // utils.js
     GUID_KEY = Ember.GUID_KEY, // utils.js
     META_KEY = Ember.META_KEY, // utils.js
+    expandProperties = Ember.expandProperties,
     removeChainWatcher = Ember.removeChainWatcher,
     watchKey = Ember.watchKey, // watch_key.js
     unwatchKey = Ember.unwatchKey,
@@ -3798,15 +3887,17 @@ function isKeyName(path) {
   @param obj
   @param {String} keyName
 */
-Ember.watch = function(obj, keyPath) {
+Ember.watch = function(obj, _keyPath) {
   // can't watch length on Array - it is special...
-  if (keyPath === 'length' && typeOf(obj) === 'array') { return; }
+  if (_keyPath === 'length' && typeOf(obj) === 'array') { return; }
 
-  if (isKeyName(keyPath)) {
-    watchKey(obj, keyPath);
-  } else {
-    watchPath(obj, keyPath);
-  }
+  expandProperties(_keyPath, function (keyPath) {
+    if (isKeyName(keyPath)) {
+      watchKey(obj, keyPath);
+    } else {
+      watchPath(obj, keyPath);
+    }
+  });
 };
 
 Ember.isWatching = function isWatching(obj, key) {
@@ -3816,15 +3907,17 @@ Ember.isWatching = function isWatching(obj, key) {
 
 Ember.watch.flushPending = Ember.flushPendingChains;
 
-Ember.unwatch = function(obj, keyPath) {
+Ember.unwatch = function(obj, _keyPath) {
   // can't watch length on Array - it is special...
-  if (keyPath === 'length' && typeOf(obj) === 'array') { return; }
+  if (_keyPath === 'length' && typeOf(obj) === 'array') { return; }
 
-  if (isKeyName(keyPath)) {
-    unwatchKey(obj, keyPath);
-  } else {
-    unwatchPath(obj, keyPath);
-  }
+  expandProperties(_keyPath, function (keyPath) {
+    if (isKeyName(keyPath)) {
+      unwatchKey(obj, keyPath);
+    } else {
+      unwatchPath(obj, keyPath);
+    }
+  });
 };
 
 /**
@@ -3843,7 +3936,7 @@ Ember.rewatch = function(obj) {
 
   // make sure the object has its own guid.
   if (GUID_KEY in obj && !obj.hasOwnProperty(GUID_KEY)) {
-    generateGuid(obj, 'ember');
+    generateGuid(obj);
   }
 
   // make sure any chained watchers update.
@@ -3909,6 +4002,7 @@ Ember.destroy = function (obj) {
 var get = Ember.get,
     set = Ember.set,
     metaFor = Ember.meta,
+    expandProperties = Ember.expandProperties,
     a_slice = [].slice,
     o_create = Ember.create,
     META_KEY = Ember.META_KEY,
@@ -4168,9 +4262,13 @@ ComputedPropertyPrototype.readOnly = function(readOnly) {
   @chainable
 */
 ComputedPropertyPrototype.property = function() {
+  function addArg(arg) {
+    args.push(arg);
+  }
+
   var args = [];
   for (var i = 0, l = arguments.length; i < l; i++) {
-    args.push(arguments[i]);
+    expandProperties(arguments[i], addArg);
   }
   this._dependentKeys = args;
   return this;
@@ -4299,7 +4397,7 @@ ComputedPropertyPrototype.set = function(obj, keyName, value) {
       funcArgLength, cachedValue, ret;
 
   if (this._readOnly) {
-    throw new Error('Cannot Set: ' + keyName + ' on: ' + obj.toString() );
+    throw new Ember.Error('Cannot Set: ' + keyName + ' on: ' + obj.toString() );
   }
 
   this._suspended = obj;
@@ -4389,7 +4487,7 @@ Ember.computed = function(func) {
   }
 
   if (typeof func !== "function") {
-    throw new Error("Computed Property declared without a property function");
+    throw new Ember.Error("Computed Property declared without a property function");
   }
 
   var cp = new ComputedProperty(func);
@@ -5023,8 +5121,9 @@ Ember.computed.defaultTo = function(defaultPath) {
 @module ember-metal
 */
 
-var AFTER_OBSERVERS = ':change';
-var BEFORE_OBSERVERS = ':before';
+var AFTER_OBSERVERS = ':change',
+    BEFORE_OBSERVERS = ':before',
+    expandProperties = Ember.expandProperties;
 
 function changeEvent(keyName) {
   return keyName+AFTER_OBSERVERS;
@@ -5041,9 +5140,12 @@ function beforeEvent(keyName) {
   @param {Object|Function} targetOrMethod
   @param {Function|String} [method]
 */
-Ember.addObserver = function(obj, path, target, method) {
-  Ember.addListener(obj, changeEvent(path), target, method);
-  Ember.watch(obj, path);
+Ember.addObserver = function(obj, _path, target, method) {
+  expandProperties(_path, function (path) {
+    Ember.addListener(obj, changeEvent(path), target, method);
+    Ember.watch(obj, path);
+  });
+
   return this;
 };
 
@@ -5058,9 +5160,11 @@ Ember.observersFor = function(obj, path) {
   @param {Object|Function} targetOrMethod
   @param {Function|String} [method]
 */
-Ember.removeObserver = function(obj, path, target, method) {
-  Ember.unwatch(obj, path);
-  Ember.removeListener(obj, changeEvent(path), target, method);
+Ember.removeObserver = function(obj, _path, target, method) {
+  expandProperties(_path, function (path) {
+    Ember.unwatch(obj, path);
+    Ember.removeListener(obj, changeEvent(path), target, method);
+  });
   return this;
 };
 
@@ -5071,9 +5175,11 @@ Ember.removeObserver = function(obj, path, target, method) {
   @param {Object|Function} targetOrMethod
   @param {Function|String} [method]
 */
-Ember.addBeforeObserver = function(obj, path, target, method) {
-  Ember.addListener(obj, beforeEvent(path), target, method);
-  Ember.watch(obj, path);
+Ember.addBeforeObserver = function(obj, _path, target, method) {
+  expandProperties(_path, function (path) {
+    Ember.addListener(obj, beforeEvent(path), target, method);
+    Ember.watch(obj, path);
+  });
   return this;
 };
 
@@ -5112,11 +5218,14 @@ Ember.beforeObserversFor = function(obj, path) {
   @param {Object|Function} targetOrMethod
   @param {Function|String} [method]
 */
-Ember.removeBeforeObserver = function(obj, path, target, method) {
-  Ember.unwatch(obj, path);
-  Ember.removeListener(obj, beforeEvent(path), target, method);
+Ember.removeBeforeObserver = function(obj, _path, target, method) {
+  expandProperties(_path, function (path) {
+    Ember.unwatch(obj, path);
+    Ember.removeListener(obj, beforeEvent(path), target, method);
+  });
   return this;
 };
+
 })();
 
 
@@ -5551,7 +5660,7 @@ define("backburner",
       throttle: function(target, method /* , args, wait */) {
         var self = this,
             args = arguments,
-            wait = pop.call(args),
+            wait = parseInt(pop.call(args), 10),
             throttler;
 
         for (var i = 0, l = throttlers.length; i < l; i++) {
@@ -5586,13 +5695,14 @@ define("backburner",
             index,
             debouncee;
 
-        if (typeof immediate === "number") {
+        if (typeof immediate === "number" || typeof immediate === "string") {
           wait = immediate;
           immediate = false;
         } else {
           wait = pop.call(args);
         }
 
+        wait = parseInt(wait, 10);
         // Remove debouncee
         index = findDebouncee(target, method);
 
@@ -7377,9 +7487,9 @@ Ember.aliasMethod = function(methodName) {
 
   ```javascript
   Ember.Object.extend({
-    valueObserver: Ember.observer(function() {
+    valueObserver: Ember.observer('value', function() {
       // Executes whenever the "value" property changes
-    }, 'value')
+    })
   });
   ```
 
@@ -7391,12 +7501,25 @@ Ember.aliasMethod = function(methodName) {
 
   @method observer
   @for Ember
-  @param {Function} func
   @param {String} propertyNames*
+  @param {Function} func
   @return func
 */
-Ember.observer = function(func) {
-  var paths = a_slice.call(arguments, 1);
+Ember.observer = function() {
+  var func  = a_slice.call(arguments, -1)[0];
+  var paths = a_slice.call(arguments, 0, -1);
+
+  if (typeof func !== "function") {
+    // revert to old, soft-deprecated argument ordering
+
+    func  = arguments[0];
+    paths = a_slice.call(arguments, 1);
+  }
+
+  if (typeof func !== "function") {
+    throw new Ember.Error("Ember.observer called without a function");
+  }
+
   func.__ember_observes__ = paths;
   return func;
 };
@@ -7406,9 +7529,9 @@ Ember.observer = function(func) {
 
   ```javascript
   Ember.Object.extend({
-    valueObserver: Ember.immediateObserver(function() {
+    valueObserver: Ember.immediateObserver('value', function() {
       // Executes whenever the "value" property changes
-    }, 'value')
+    })
   });
   ```
 
@@ -7420,8 +7543,8 @@ Ember.observer = function(func) {
 
   @method immediateObserver
   @for Ember
-  @param {Function} func
   @param {String} propertyNames*
+  @param {Function} func
   @return func
 */
 Ember.immediateObserver = function() {
@@ -7448,22 +7571,22 @@ Ember.immediateObserver = function() {
 
     friends: [{ name: 'Tom' }, { name: 'Stefan' }, { name: 'Kris' }],
 
-    valueWillChange: Ember.beforeObserver(function(obj, keyName) {
+    valueWillChange: Ember.beforeObserver('content.value', function(obj, keyName) {
       this.changingFrom = obj.get(keyName);
-    }, 'content.value'),
+    }),
 
-    valueDidChange: Ember.observer(function(obj, keyName) {
+    valueDidChange: Ember.observer('content.value', function(obj, keyName) {
         // only run if updating a value already in the DOM
         if (this.get('state') === 'inDOM') {
           var color = obj.get(keyName) > this.changingFrom ? 'green' : 'red';
           // logic
         }
-    }, 'content.value'),
+    }),
 
-    friendsDidChange: Ember.observer(function(obj, keyName) {
+    friendsDidChange: Ember.observer('friends.@each.name', function(obj, keyName) {
       // some logic
       // obj.get(keyName) returns friends array
-    }, 'friends.@each.name')
+    })
   });
   ```
 
@@ -7472,12 +7595,25 @@ Ember.immediateObserver = function() {
 
   @method beforeObserver
   @for Ember
-  @param {Function} func
   @param {String} propertyNames*
+  @param {Function} func
   @return func
 */
-Ember.beforeObserver = function(func) {
-  var paths = a_slice.call(arguments, 1);
+Ember.beforeObserver = function() {
+  var func  = a_slice.call(arguments, -1)[0];
+  var paths = a_slice.call(arguments, 0, -1);
+
+  if (typeof func !== "function") {
+    // revert to old, soft-deprecated argument ordering
+
+    func  = arguments[0];
+    paths = a_slice.call(arguments, 1);
+  }
+
+  if (typeof func !== "function") {
+    throw new Ember.Error("Ember.beforeObserver called without a function");
+  }
+
   func.__ember_observesBefore__ = paths;
   return func;
 };
@@ -8159,2363 +8295,4 @@ define("rsvp/rethrow",
     __exports__.rethrow = rethrow;
   });
 define("rsvp",
-  ["rsvp/events","rsvp/promise","rsvp/node","rsvp/all","rsvp/hash","rsvp/rethrow","rsvp/defer","rsvp/config","rsvp/resolve","rsvp/reject","exports"],
-  function(__dependency1__, __dependency2__, __dependency3__, __dependency4__, __dependency5__, __dependency6__, __dependency7__, __dependency8__, __dependency9__, __dependency10__, __exports__) {
-    "use strict";
-    var EventTarget = __dependency1__.EventTarget;
-    var Promise = __dependency2__.Promise;
-    var denodeify = __dependency3__.denodeify;
-    var all = __dependency4__.all;
-    var hash = __dependency5__.hash;
-    var rethrow = __dependency6__.rethrow;
-    var defer = __dependency7__.defer;
-    var config = __dependency8__.config;
-    var resolve = __dependency9__.resolve;
-    var reject = __dependency10__.reject;
-
-    function configure(name, value) {
-      config[name] = value;
-    }
-
-
-    __exports__.Promise = Promise;
-    __exports__.EventTarget = EventTarget;
-    __exports__.all = all;
-    __exports__.hash = hash;
-    __exports__.rethrow = rethrow;
-    __exports__.defer = defer;
-    __exports__.denodeify = denodeify;
-    __exports__.configure = configure;
-    __exports__.resolve = resolve;
-    __exports__.reject = reject;
-  });
-})();
-
-(function() {
-/**
-@private
-Public api for the container is still in flux.
-The public api, specified on the application namespace should be considered the stable api.
-// @module container
-*/
-
-/*
- Flag to enable/disable model factory injections (disabled by default)
- If model factory injections are enabled, models should not be
- accessed globally (only through `container.lookupFactory('model:modelName'))`);
-*/
-Ember.MODEL_FACTORY_INJECTIONS = false || !!Ember.ENV.MODEL_FACTORY_INJECTIONS;
-
-define("container",
-  [],
-  function() {
-
-    // A safe and simple inheriting object.
-    function InheritingDict(parent) {
-      this.parent = parent;
-      this.dict = {};
-    }
-
-    InheritingDict.prototype = {
-
-      /**
-        @property parent
-        @type InheritingDict
-        @default null
-      */
-
-      parent: null,
-
-      /**
-        Object used to store the current nodes data.
-
-        @property dict
-        @type Object
-        @default Object
-      */
-      dict: null,
-
-      /**
-        Retrieve the value given a key, if the value is present at the current
-        level use it, otherwise walk up the parent hierarchy and try again. If
-        no matching key is found, return undefined.
-
-        @method get
-        @return {any}
-      */
-      get: function(key) {
-        var dict = this.dict;
-
-        if (dict.hasOwnProperty(key)) {
-          return dict[key];
-        }
-
-        if (this.parent) {
-          return this.parent.get(key);
-        }
-      },
-
-      /**
-        Set the given value for the given key, at the current level.
-
-        @method set
-        @param {String} key
-        @param {Any} value
-      */
-      set: function(key, value) {
-        this.dict[key] = value;
-      },
-
-      /**
-        Delete the given key
-
-        @method remove
-        @param {String} key
-      */
-      remove: function(key) {
-        delete this.dict[key];
-      },
-
-      /**
-        Check for the existence of given a key, if the key is present at the current
-        level return true, otherwise walk up the parent hierarchy and try again. If
-        no matching key is found, return false.
-
-        @method has
-        @param {String} key
-        @return {Boolean}
-      */
-      has: function(key) {
-        var dict = this.dict;
-
-        if (dict.hasOwnProperty(key)) {
-          return true;
-        }
-
-        if (this.parent) {
-          return this.parent.has(key);
-        }
-
-        return false;
-      },
-
-      /**
-        Iterate and invoke a callback for each local key-value pair.
-
-        @method eachLocal
-        @param {Function} callback
-        @param {Object} binding
-      */
-      eachLocal: function(callback, binding) {
-        var dict = this.dict;
-
-        for (var prop in dict) {
-          if (dict.hasOwnProperty(prop)) {
-            callback.call(binding, prop, dict[prop]);
-          }
-        }
-      }
-    };
-
-
-    // A lightweight container that helps to assemble and decouple components.
-    // Public api for the container is still in flux.
-    // The public api, specified on the application namespace should be considered the stable api.
-    function Container(parent) {
-      this.parent = parent;
-      this.children = [];
-
-      this.resolver = parent && parent.resolver || function() {};
-
-      this.registry = new InheritingDict(parent && parent.registry);
-      this.cache = new InheritingDict(parent && parent.cache);
-      this.factoryCache = new InheritingDict(parent && parent.cache);
-      this.typeInjections = new InheritingDict(parent && parent.typeInjections);
-      this.injections = {};
-
-      this.factoryTypeInjections = new InheritingDict(parent && parent.factoryTypeInjections);
-      this.factoryInjections = {};
-
-      this._options = new InheritingDict(parent && parent._options);
-      this._typeOptions = new InheritingDict(parent && parent._typeOptions);
-    }
-
-    Container.prototype = {
-
-      /**
-        @property parent
-        @type Container
-        @default null
-      */
-      parent: null,
-
-      /**
-        @property children
-        @type Array
-        @default []
-      */
-      children: null,
-
-      /**
-        @property resolver
-        @type function
-      */
-      resolver: null,
-
-      /**
-        @property registry
-        @type InheritingDict
-      */
-      registry: null,
-
-      /**
-        @property cache
-        @type InheritingDict
-      */
-      cache: null,
-
-      /**
-        @property typeInjections
-        @type InheritingDict
-      */
-      typeInjections: null,
-
-      /**
-        @property injections
-        @type Object
-        @default {}
-      */
-      injections: null,
-
-      /**
-        @private
-
-        @property _options
-        @type InheritingDict
-        @default null
-      */
-      _options: null,
-
-      /**
-        @private
-
-        @property _typeOptions
-        @type InheritingDict
-      */
-      _typeOptions: null,
-
-      /**
-        Returns a new child of the current container. These children are configured
-        to correctly inherit from the current container.
-
-        @method child
-        @return {Container}
-      */
-      child: function() {
-        var container = new Container(this);
-        this.children.push(container);
-        return container;
-      },
-
-      /**
-        Sets a key-value pair on the current container. If a parent container,
-        has the same key, once set on a child, the parent and child will diverge
-        as expected.
-
-        @method set
-        @param {Object} object
-        @param {String} key
-        @param {any} value
-      */
-      set: function(object, key, value) {
-        object[key] = value;
-      },
-
-      /**
-        Registers a factory for later injection.
-
-        Example:
-
-        ```javascript
-        var container = new Container();
-
-        container.register('model:user', Person, {singleton: false });
-        container.register('fruit:favorite', Orange);
-        container.register('communication:main', Email, {singleton: false});
-        ```
-
-        @method register
-        @param {String} fullName
-        @param {Function} factory
-        @param {Object} options
-      */
-      register: function(fullName, factory, options) {
-        if (fullName.indexOf(':') === -1) {
-          throw new TypeError("malformed fullName, expected: `type:name` got: " + fullName + "");
-        }
-
-        if (factory === undefined) {
-          throw new TypeError('Attempting to register an unknown factory: `' + fullName + '`');
-        }
-
-        var normalizedName = this.normalize(fullName);
-
-        if (this.cache.has(normalizedName)) {
-          throw new Error('Cannot re-register: `' + fullName +'`, as it has already been looked up.');
-        }
-
-        this.registry.set(normalizedName, factory);
-        this._options.set(normalizedName, options || {});
-      },
-
-      /**
-        Unregister a fullName
-
-        ```javascript
-        var container = new Container();
-        container.register('model:user', User);
-
-        container.lookup('model:user') instanceof User //=> true
-
-        container.unregister('model:user')
-        container.lookup('model:user') === undefined //=> true
-        ```
-
-        @method unregister
-        @param {String} fullName
-       */
-      unregister: function(fullName) {
-        var normalizedName = this.normalize(fullName);
-
-        this.registry.remove(normalizedName);
-        this.cache.remove(normalizedName);
-        this.factoryCache.remove(normalizedName);
-        this._options.remove(normalizedName);
-      },
-
-      /**
-        Given a fullName return the corresponding factory.
-
-        By default `resolve` will retrieve the factory from
-        its container's registry.
-
-        ```javascript
-        var container = new Container();
-        container.register('api:twitter', Twitter);
-
-        container.resolve('api:twitter') // => Twitter
-        ```
-
-        Optionally the container can be provided with a custom resolver.
-        If provided, `resolve` will first provide the custom resolver
-        the oppertunity to resolve the fullName, otherwise it will fallback
-        to the registry.
-
-        ```javascript
-        var container = new Container();
-        container.resolver = function(fullName) {
-          // lookup via the module system of choice
-        };
-
-        // the twitter factory is added to the module system
-        container.resolve('api:twitter') // => Twitter
-        ```
-
-        @method resolve
-        @param {String} fullName
-        @return {Function} fullName's factory
-      */
-      resolve: function(fullName) {
-        return this.resolver(fullName) || this.registry.get(fullName);
-      },
-
-      /**
-        A hook that can be used to describe how the resolver will
-        attempt to find the factory.
-
-        For example, the default Ember `.describe` returns the full
-        class name (including namespace) where Ember's resolver expects
-        to find the `fullName`.
-
-        @method describe
-      */
-      describe: function(fullName) {
-        return fullName;
-      },
-
-      /**
-        A hook to enable custom fullName normalization behaviour
-
-        @method normalize
-        @param {String} fullName
-        @return {string} normalized fullName
-      */
-      normalize: function(fullName) {
-        return fullName;
-      },
-
-      /**
-        @method makeToString
-
-        @param {any} factory
-        @param {string} fullName
-        @return {function} toString function
-      */
-      makeToString: function(factory, fullName) {
-        return factory.toString();
-      },
-
-      /**
-        Given a fullName return a corresponding instance.
-
-        The default behaviour is for lookup to return a singleton instance.
-        The singleton is scoped to the container, allowing multiple containers
-        to all have their own locally scoped singletons.
-
-        ```javascript
-        var container = new Container();
-        container.register('api:twitter', Twitter);
-
-        var twitter = container.lookup('api:twitter');
-
-        twitter instanceof Twitter; // => true
-
-        // by default the container will return singletons
-        twitter2 = container.lookup('api:twitter');
-        twitter instanceof Twitter; // => true
-
-        twitter === twitter2; //=> true
-        ```
-
-        If singletons are not wanted an optional flag can be provided at lookup.
-
-        ```javascript
-        var container = new Container();
-        container.register('api:twitter', Twitter);
-
-        var twitter = container.lookup('api:twitter', { singleton: false });
-        var twitter2 = container.lookup('api:twitter', { singleton: false });
-
-        twitter === twitter2; //=> false
-        ```
-
-        @method lookup
-        @param {String} fullName
-        @param {Object} options
-        @return {any}
-      */
-      lookup: function(fullName, options) {
-        fullName = this.normalize(fullName);
-
-        options = options || {};
-
-        if (this.cache.has(fullName) && options.singleton !== false) {
-          return this.cache.get(fullName);
-        }
-
-        var value = instantiate(this, fullName);
-
-        if (value === undefined) { return; }
-
-        if (isSingleton(this, fullName) && options.singleton !== false) {
-          this.cache.set(fullName, value);
-        }
-
-        return value;
-      },
-
-      /**
-        Given a fullName return the corresponding factory.
-
-        @method lookupFactory
-        @param {String} fullName
-        @return {any}
-      */
-      lookupFactory: function(fullName) {
-        return factoryFor(this, fullName);
-      },
-
-      /**
-        Given a fullName check if the container is aware of its factory
-        or singleton instance.
-
-        @method has
-        @param {String} fullName
-        @return {Boolean}
-      */
-      has: function(fullName) {
-        if (this.cache.has(fullName)) {
-          return true;
-        }
-
-        return !!factoryFor(this, fullName);
-      },
-
-      /**
-        Allow registering options for all factories of a type.
-
-        ```javascript
-        var container = new Container();
-
-        // if all of type `connection` must not be singletons
-        container.optionsForType('connection', { singleton: false });
-
-        container.register('connection:twitter', TwitterConnection);
-        container.register('connection:facebook', FacebookConnection);
-
-        var twitter = container.lookup('connection:twitter');
-        var twitter2 = container.lookup('connection:twitter');
-
-        twitter === twitter2; // => false
-
-        var facebook = container.lookup('connection:facebook');
-        var facebook2 = container.lookup('connection:facebook');
-
-        facebook === facebook2; // => false
-        ```
-
-        @method optionsForType
-        @param {String} type
-        @param {Object} options
-      */
-      optionsForType: function(type, options) {
-        if (this.parent) { illegalChildOperation('optionsForType'); }
-
-        this._typeOptions.set(type, options);
-      },
-
-      /**
-        @method options
-        @param {String} type
-        @param {Object} options
-      */
-      options: function(type, options) {
-        this.optionsForType(type, options);
-      },
-
-      /**
-        @private
-
-        Used only via `injection`.
-
-        Provides a specialized form of injection, specifically enabling
-        all objects of one type to be injected with a reference to another
-        object.
-
-        For example, provided each object of type `controller` needed a `router`.
-        one would do the following:
-
-        ```javascript
-        var container = new Container();
-
-        container.register('router:main', Router);
-        container.register('controller:user', UserController);
-        container.register('controller:post', PostController);
-
-        container.typeInjection('controller', 'router', 'router:main');
-
-        var user = container.lookup('controller:user');
-        var post = container.lookup('controller:post');
-
-        user.router instanceof Router; //=> true
-        post.router instanceof Router; //=> true
-
-        // both controllers share the same router
-        user.router === post.router; //=> true
-        ```
-
-        @method typeInjection
-        @param {String} type
-        @param {String} property
-        @param {String} fullName
-      */
-      typeInjection: function(type, property, fullName) {
-        if (this.parent) { illegalChildOperation('typeInjection'); }
-
-        addTypeInjection(this.typeInjections, type, property, fullName);
-      },
-
-      /**
-        Defines injection rules.
-
-        These rules are used to inject dependencies onto objects when they
-        are instantiated.
-
-        Two forms of injections are possible:
-
-      * Injecting one fullName on another fullName
-      * Injecting one fullName on a type
-
-        Example:
-
-        ```javascript
-        var container = new Container();
-
-        container.register('source:main', Source);
-        container.register('model:user', User);
-        container.register('model:post', Post);
-
-        // injecting one fullName on another fullName
-        // eg. each user model gets a post model
-        container.injection('model:user', 'post', 'model:post');
-
-        // injecting one fullName on another type
-        container.injection('model', 'source', 'source:main');
-
-        var user = container.lookup('model:user');
-        var post = container.lookup('model:post');
-
-        user.source instanceof Source; //=> true
-        post.source instanceof Source; //=> true
-
-        user.post instanceof Post; //=> true
-
-        // and both models share the same source
-        user.source === post.source; //=> true
-        ```
-
-        @method injection
-        @param {String} factoryName
-        @param {String} property
-        @param {String} injectionName
-      */
-      injection: function(factoryName, property, injectionName) {
-        if (this.parent) { illegalChildOperation('injection'); }
-
-        if (factoryName.indexOf(':') === -1) {
-          return this.typeInjection(factoryName, property, injectionName);
-        }
-
-        addInjection(this.injections, factoryName, property, injectionName);
-      },
-
-
-      /**
-        @private
-
-        Used only via `factoryInjection`.
-
-        Provides a specialized form of injection, specifically enabling
-        all factory of one type to be injected with a reference to another
-        object.
-
-        For example, provided each factory of type `model` needed a `store`.
-        one would do the following:
-
-        ```javascript
-        var container = new Container();
-
-        container.registerFactory('model:user', User);
-        container.register('store:main', SomeStore);
-
-        container.factoryTypeInjection('model', 'store', 'store:main');
-
-        var store = container.lookup('store:main');
-        var UserFactory = container.lookupFactory('model:user');
-
-        UserFactory.store instanceof SomeStore; //=> true
-        ```
-
-        @method factoryTypeInjection
-        @param {String} type
-        @param {String} property
-        @param {String} fullName
-      */
-      factoryTypeInjection: function(type, property, fullName) {
-        if (this.parent) { illegalChildOperation('factoryTypeInjection'); }
-
-        addTypeInjection(this.factoryTypeInjections, type, property, fullName);
-      },
-
-      /**
-        Defines factory injection rules.
-
-        Similar to regular injection rules, but are run against factories, via
-        `Container#lookupFactory`.
-
-        These rules are used to inject objects onto factories when they
-        are looked up.
-
-        Two forms of injections are possible:
-
-      * Injecting one fullName on another fullName
-      * Injecting one fullName on a type
-
-        Example:
-
-        ```javascript
-        var container = new Container();
-
-        container.register('store:main', Store);
-        container.register('store:secondary', OtherStore);
-        container.register('model:user', User);
-        container.register('model:post', Post);
-
-        // injecting one fullName on another type
-        container.factoryInjection('model', 'store', 'store:main');
-
-        // injecting one fullName on another fullName
-        container.factoryInjection('model:post', 'secondaryStore', 'store:secondary');
-
-        var UserFactory = container.lookupFactory('model:user');
-        var PostFactory = container.lookupFactory('model:post');
-        var store = container.lookup('store:main');
-
-        UserFactory.store instanceof Store; //=> true
-        UserFactory.secondaryStore instanceof OtherStore; //=> false
-
-        PostFactory.store instanceof Store; //=> true
-        PostFactory.secondaryStore instanceof OtherStore; //=> true
-
-        // and both models share the same source instance
-        UserFactory.store === PostFactory.store; //=> true
-        ```
-
-        @method factoryInjection
-        @param {String} factoryName
-        @param {String} property
-        @param {String} injectionName
-      */
-      factoryInjection: function(factoryName, property, injectionName) {
-        if (this.parent) { illegalChildOperation('injection'); }
-
-        if (factoryName.indexOf(':') === -1) {
-          return this.factoryTypeInjection(factoryName, property, injectionName);
-        }
-
-        addInjection(this.factoryInjections, factoryName, property, injectionName);
-      },
-
-      /**
-        A depth first traversal, destroying the container, its descendant containers and all
-        their managed objects.
-
-        @method destroy
-      */
-      destroy: function() {
-        this.isDestroyed = true;
-
-        for (var i=0, l=this.children.length; i<l; i++) {
-          this.children[i].destroy();
-        }
-
-        this.children = [];
-
-        eachDestroyable(this, function(item) {
-          item.destroy();
-        });
-
-        this.parent = undefined;
-        this.isDestroyed = true;
-      },
-
-      /**
-        @method reset
-      */
-      reset: function() {
-        for (var i=0, l=this.children.length; i<l; i++) {
-          resetCache(this.children[i]);
-        }
-        resetCache(this);
-      }
-    };
-
-    function illegalChildOperation(operation) {
-      throw new Error(operation + " is not currently supported on child containers");
-    }
-
-    function isSingleton(container, fullName) {
-      var singleton = option(container, fullName, 'singleton');
-
-      return singleton !== false;
-    }
-
-    function buildInjections(container, injections) {
-      var hash = {};
-
-      if (!injections) { return hash; }
-
-      var injection, lookup;
-
-      for (var i=0, l=injections.length; i<l; i++) {
-        injection = injections[i];
-        lookup = container.lookup(injection.fullName);
-
-        if (lookup !== undefined) {
-          hash[injection.property] = lookup;
-        } else {
-          throw new Error('Attempting to inject an unknown injection: `' + injection.fullName + '`');
-        }
-      }
-
-      return hash;
-    }
-
-    function option(container, fullName, optionName) {
-      var options = container._options.get(fullName);
-
-      if (options && options[optionName] !== undefined) {
-        return options[optionName];
-      }
-
-      var type = fullName.split(":")[0];
-      options = container._typeOptions.get(type);
-
-      if (options) {
-        return options[optionName];
-      }
-    }
-
-    function factoryFor(container, fullName) {
-      var name = container.normalize(fullName);
-      var factory = container.resolve(name);
-      var injectedFactory;
-      var cache = container.factoryCache;
-      var type = fullName.split(":")[0];
-
-      if (factory === undefined) { return; }
-
-      if (cache.has(fullName)) {
-        return cache.get(fullName);
-      }
-
-      if (!factory || typeof factory.extend !== 'function' || (!Ember.MODEL_FACTORY_INJECTIONS && type === 'model')) {
-        // TODO: think about a 'safe' merge style extension
-        // for now just fallback to create time injection
-        return factory;
-      } else {
-
-        var injections        = injectionsFor(container, fullName);
-        var factoryInjections = factoryInjectionsFor(container, fullName);
-
-        factoryInjections._toString = container.makeToString(factory, fullName);
-
-        injectedFactory = factory.extend(injections);
-        injectedFactory.reopenClass(factoryInjections);
-
-        cache.set(fullName, injectedFactory);
-
-        return injectedFactory;
-      }
-    }
-
-    function injectionsFor(container ,fullName) {
-      var splitName = fullName.split(":"),
-        type = splitName[0],
-        injections = [];
-
-      injections = injections.concat(container.typeInjections.get(type) || []);
-      injections = injections.concat(container.injections[fullName] || []);
-
-      injections = buildInjections(container, injections);
-      injections._debugContainerKey = fullName;
-      injections.container = container;
-
-      return injections;
-    }
-
-    function factoryInjectionsFor(container, fullName) {
-      var splitName = fullName.split(":"),
-        type = splitName[0],
-        factoryInjections = [];
-
-      factoryInjections = factoryInjections.concat(container.factoryTypeInjections.get(type) || []);
-      factoryInjections = factoryInjections.concat(container.factoryInjections[fullName] || []);
-
-      factoryInjections = buildInjections(container, factoryInjections);
-      factoryInjections._debugContainerKey = fullName;
-
-      return factoryInjections;
-    }
-
-    function instantiate(container, fullName) {
-      var factory = factoryFor(container, fullName);
-
-      if (option(container, fullName, 'instantiate') === false) {
-        return factory;
-      }
-
-      if (factory) {
-        if (typeof factory.extend === 'function') {
-          // assume the factory was extendable and is already injected
-          return factory.create();
-        } else {
-          // assume the factory was extendable
-          // to create time injections
-          // TODO: support new'ing for instantiation and merge injections for pure JS Functions
-          return factory.create(injectionsFor(container, fullName));
-        }
-      }
-    }
-
-    function eachDestroyable(container, callback) {
-      container.cache.eachLocal(function(key, value) {
-        if (option(container, key, 'instantiate') === false) { return; }
-        callback(value);
-      });
-    }
-
-    function resetCache(container) {
-      container.cache.eachLocal(function(key, value) {
-        if (option(container, key, 'instantiate') === false) { return; }
-        value.destroy();
-      });
-      container.cache.dict = {};
-    }
-
-    function addTypeInjection(rules, type, property, fullName) {
-      var injections = rules.get(type);
-
-      if (!injections) {
-        injections = [];
-        rules.set(type, injections);
-      }
-
-      injections.push({
-        property: property,
-        fullName: fullName
-      });
-    }
-
-    function addInjection(rules, factoryName, property, injectionName) {
-      var injections = rules[factoryName] = rules[factoryName] || [];
-      injections.push({ property: property, fullName: injectionName });
-    }
-
-    return Container;
-});
-
-})();
-
-(function() {
-/*globals ENV */
-/**
-@module ember
-@submodule ember-runtime
-*/
-
-var indexOf = Ember.EnumerableUtils.indexOf;
-
-/**
- This will compare two javascript values of possibly different types.
- It will tell you which one is greater than the other by returning:
-
-  - -1 if the first is smaller than the second,
-  - 0 if both are equal,
-  - 1 if the first is greater than the second.
-
- The order is calculated based on `Ember.ORDER_DEFINITION`, if types are different.
- In case they have the same type an appropriate comparison for this type is made.
-
-  ```javascript
-  Ember.compare('hello', 'hello');  // 0
-  Ember.compare('abc', 'dfg');      // -1
-  Ember.compare(2, 1);              // 1
-  ```
-
- @method compare
- @for Ember
- @param {Object} v First value to compare
- @param {Object} w Second value to compare
- @return {Number} -1 if v < w, 0 if v = w and 1 if v > w.
-*/
-Ember.compare = function compare(v, w) {
-  if (v === w) { return 0; }
-
-  var type1 = Ember.typeOf(v);
-  var type2 = Ember.typeOf(w);
-
-  var Comparable = Ember.Comparable;
-  if (Comparable) {
-    if (type1==='instance' && Comparable.detect(v.constructor)) {
-      return v.constructor.compare(v, w);
-    }
-
-    if (type2 === 'instance' && Comparable.detect(w.constructor)) {
-      return 1-w.constructor.compare(w, v);
-    }
-  }
-
-  // If we haven't yet generated a reverse-mapping of Ember.ORDER_DEFINITION,
-  // do so now.
-  var mapping = Ember.ORDER_DEFINITION_MAPPING;
-  if (!mapping) {
-    var order = Ember.ORDER_DEFINITION;
-    mapping = Ember.ORDER_DEFINITION_MAPPING = {};
-    var idx, len;
-    for (idx = 0, len = order.length; idx < len;  ++idx) {
-      mapping[order[idx]] = idx;
-    }
-
-    // We no longer need Ember.ORDER_DEFINITION.
-    delete Ember.ORDER_DEFINITION;
-  }
-
-  var type1Index = mapping[type1];
-  var type2Index = mapping[type2];
-
-  if (type1Index < type2Index) { return -1; }
-  if (type1Index > type2Index) { return 1; }
-
-  // types are equal - so we have to check values now
-  switch (type1) {
-    case 'boolean':
-    case 'number':
-      if (v < w) { return -1; }
-      if (v > w) { return 1; }
-      return 0;
-
-    case 'string':
-      var comp = v.localeCompare(w);
-      if (comp < 0) { return -1; }
-      if (comp > 0) { return 1; }
-      return 0;
-
-    case 'array':
-      var vLen = v.length;
-      var wLen = w.length;
-      var l = Math.min(vLen, wLen);
-      var r = 0;
-      var i = 0;
-      while (r === 0 && i < l) {
-        r = compare(v[i],w[i]);
-        i++;
-      }
-      if (r !== 0) { return r; }
-
-      // all elements are equal now
-      // shorter array should be ordered first
-      if (vLen < wLen) { return -1; }
-      if (vLen > wLen) { return 1; }
-      // arrays are equal now
-      return 0;
-
-    case 'instance':
-      if (Ember.Comparable && Ember.Comparable.detect(v)) {
-        return v.compare(v, w);
-      }
-      return 0;
-
-    case 'date':
-      var vNum = v.getTime();
-      var wNum = w.getTime();
-      if (vNum < wNum) { return -1; }
-      if (vNum > wNum) { return 1; }
-      return 0;
-
-    default:
-      return 0;
-  }
-};
-
-function _copy(obj, deep, seen, copies) {
-  var ret, loc, key;
-
-  // primitive data types are immutable, just return them.
-  if ('object' !== typeof obj || obj===null) return obj;
-
-  // avoid cyclical loops
-  if (deep && (loc=indexOf(seen, obj))>=0) return copies[loc];
-
-
-  // IMPORTANT: this specific test will detect a native array only. Any other
-  // object will need to implement Copyable.
-  if (Ember.typeOf(obj) === 'array') {
-    ret = obj.slice();
-    if (deep) {
-      loc = ret.length;
-      while(--loc>=0) ret[loc] = _copy(ret[loc], deep, seen, copies);
-    }
-  } else if (Ember.Copyable && Ember.Copyable.detect(obj)) {
-    ret = obj.copy(deep, seen, copies);
-  } else {
-    ret = {};
-    for(key in obj) {
-      if (!obj.hasOwnProperty(key)) continue;
-
-      // Prevents browsers that don't respect non-enumerability from
-      // copying internal Ember properties
-      if (key.substring(0,2) === '__') continue;
-
-      ret[key] = deep ? _copy(obj[key], deep, seen, copies) : obj[key];
-    }
-  }
-
-  if (deep) {
-    seen.push(obj);
-    copies.push(ret);
-  }
-
-  return ret;
-}
-
-/**
-  Creates a clone of the passed object. This function can take just about
-  any type of object and create a clone of it, including primitive values
-  (which are not actually cloned because they are immutable).
-
-  If the passed object implements the `clone()` method, then this function
-  will simply call that method and return the result.
-
-  @method copy
-  @for Ember
-  @param {Object} obj The object to clone
-  @param {Boolean} deep If true, a deep copy of the object is made
-  @return {Object} The cloned object
-*/
-Ember.copy = function(obj, deep) {
-  // fast paths
-  if ('object' !== typeof obj || obj===null) return obj; // can't copy primitives
-  if (Ember.Copyable && Ember.Copyable.detect(obj)) return obj.copy(deep);
-  return _copy(obj, deep, deep ? [] : null, deep ? [] : null);
-};
-
-/**
-  Convenience method to inspect an object. This method will attempt to
-  convert the object into a useful string description.
-
-  It is a pretty simple implementation. If you want something more robust,
-  use something like JSDump: https://github.com/NV/jsDump
-
-  @method inspect
-  @for Ember
-  @param {Object} obj The object you want to inspect.
-  @return {String} A description of the object
-*/
-Ember.inspect = function(obj) {
-  var type = Ember.typeOf(obj);
-  if (type === 'array') {
-    return '[' + obj + ']';
-  }
-  if (type !== 'object') {
-    return obj + '';
-  }
-
-  var v, ret = [];
-  for(var key in obj) {
-    if (obj.hasOwnProperty(key)) {
-      v = obj[key];
-      if (v === 'toString') { continue; } // ignore useless items
-      if (Ember.typeOf(v) === 'function') { v = "function() { ... }"; }
-      ret.push(key + ": " + v);
-    }
-  }
-  return "{" + ret.join(", ") + "}";
-};
-
-/**
-  Compares two objects, returning true if they are logically equal. This is
-  a deeper comparison than a simple triple equal. For sets it will compare the
-  internal objects. For any other object that implements `isEqual()` it will
-  respect that method.
-
-  ```javascript
-  Ember.isEqual('hello', 'hello');  // true
-  Ember.isEqual(1, 2);              // false
-  Ember.isEqual([4,2], [4,2]);      // false
-  ```
-
-  @method isEqual
-  @for Ember
-  @param {Object} a first object to compare
-  @param {Object} b second object to compare
-  @return {Boolean}
-*/
-Ember.isEqual = function(a, b) {
-  if (a && 'function'===typeof a.isEqual) return a.isEqual(b);
-  return a === b;
-};
-
-// Used by Ember.compare
-Ember.ORDER_DEFINITION = Ember.ENV.ORDER_DEFINITION || [
-  'undefined',
-  'null',
-  'boolean',
-  'number',
-  'string',
-  'array',
-  'object',
-  'instance',
-  'function',
-  'class',
-  'date'
-];
-
-/**
-  Returns all of the keys defined on an object or hash. This is useful
-  when inspecting objects for debugging. On browsers that support it, this
-  uses the native `Object.keys` implementation.
-
-  @method keys
-  @for Ember
-  @param {Object} obj
-  @return {Array} Array containing keys of obj
-*/
-Ember.keys = Object.keys;
-
-if (!Ember.keys || Ember.create.isSimulated) {
-  var prototypeProperties = [
-    'constructor',
-    'hasOwnProperty',
-    'isPrototypeOf',
-    'propertyIsEnumerable',
-    'valueOf',
-    'toLocaleString',
-    'toString'
-  ],
-  pushPropertyName = function(obj, array, key) {
-    // Prevents browsers that don't respect non-enumerability from
-    // copying internal Ember properties
-    if (key.substring(0,2) === '__') return;
-    if (key === '_super') return;
-    if (indexOf(array, key) >= 0) return;
-    if (!obj.hasOwnProperty(key)) return;
-
-    array.push(key);
-  };
-
-  Ember.keys = function(obj) {
-    var ret = [], key;
-    for (key in obj) {
-      pushPropertyName(obj, ret, key);
-    }
-
-    // IE8 doesn't enumerate property that named the same as prototype properties.
-    for (var i = 0, l = prototypeProperties.length; i < l; i++) {
-      key = prototypeProperties[i];
-
-      pushPropertyName(obj, ret, key);
-    }
-
-    return ret;
-  };
-}
-
-// ..........................................................
-// ERROR
-//
-
-var errorProps = ['description', 'fileName', 'lineNumber', 'message', 'name', 'number', 'stack'];
-
-/**
-  A subclass of the JavaScript Error object for use in Ember.
-
-  @class Error
-  @namespace Ember
-  @extends Error
-  @constructor
-*/
-Ember.Error = function() {
-  var tmp = Error.apply(this, arguments);
-
-  // Unfortunately errors are not enumerable in Chrome (at least), so `for prop in tmp` doesn't work.
-  for (var idx = 0; idx < errorProps.length; idx++) {
-    this[errorProps[idx]] = tmp[errorProps[idx]];
-  }
-};
-
-Ember.Error.prototype = Ember.create(Error.prototype);
-
-})();
-
-
-
-(function() {
-/**
-@module ember
-@submodule ember-runtime
-*/
-
-// ..........................................................
-// HELPERS
-//
-
-var get = Ember.get, set = Ember.set;
-var a_slice = Array.prototype.slice;
-var a_indexOf = Ember.EnumerableUtils.indexOf;
-
-var contexts = [];
-
-function popCtx() {
-  return contexts.length===0 ? {} : contexts.pop();
-}
-
-function pushCtx(ctx) {
-  contexts.push(ctx);
-  return null;
-}
-
-function iter(key, value) {
-  var valueProvided = arguments.length === 2;
-
-  function i(item) {
-    var cur = get(item, key);
-    return valueProvided ? value===cur : !!cur;
-  }
-  return i ;
-}
-
-/**
-  This mixin defines the common interface implemented by enumerable objects
-  in Ember. Most of these methods follow the standard Array iteration
-  API defined up to JavaScript 1.8 (excluding language-specific features that
-  cannot be emulated in older versions of JavaScript).
-
-  This mixin is applied automatically to the Array class on page load, so you
-  can use any of these methods on simple arrays. If Array already implements
-  one of these methods, the mixin will not override them.
-
-  ## Writing Your Own Enumerable
-
-  To make your own custom class enumerable, you need two items:
-
-  1. You must have a length property. This property should change whenever
-     the number of items in your enumerable object changes. If you using this
-     with an `Ember.Object` subclass, you should be sure to change the length
-     property using `set().`
-
-  2. If you must implement `nextObject().` See documentation.
-
-  Once you have these two methods implement, apply the `Ember.Enumerable` mixin
-  to your class and you will be able to enumerate the contents of your object
-  like any other collection.
-
-  ## Using Ember Enumeration with Other Libraries
-
-  Many other libraries provide some kind of iterator or enumeration like
-  facility. This is often where the most common API conflicts occur.
-  Ember's API is designed to be as friendly as possible with other
-  libraries by implementing only methods that mostly correspond to the
-  JavaScript 1.8 API.
-
-  @class Enumerable
-  @namespace Ember
-  @since Ember 0.9
-*/
-Ember.Enumerable = Ember.Mixin.create({
-
-  /**
-    Implement this method to make your class enumerable.
-
-    This method will be call repeatedly during enumeration. The index value
-    will always begin with 0 and increment monotonically. You don't have to
-    rely on the index value to determine what object to return, but you should
-    always check the value and start from the beginning when you see the
-    requested index is 0.
-
-    The `previousObject` is the object that was returned from the last call
-    to `nextObject` for the current iteration. This is a useful way to
-    manage iteration if you are tracing a linked list, for example.
-
-    Finally the context parameter will always contain a hash you can use as
-    a "scratchpad" to maintain any other state you need in order to iterate
-    properly. The context object is reused and is not reset between
-    iterations so make sure you setup the context with a fresh state whenever
-    the index parameter is 0.
-
-    Generally iterators will continue to call `nextObject` until the index
-    reaches the your current length-1. If you run out of data before this
-    time for some reason, you should simply return undefined.
-
-    The default implementation of this method simply looks up the index.
-    This works great on any Array-like objects.
-
-    @method nextObject
-    @param {Number} index the current index of the iteration
-    @param {Object} previousObject the value returned by the last call to
-      `nextObject`.
-    @param {Object} context a context object you can use to maintain state.
-    @return {Object} the next object in the iteration or undefined
-  */
-  nextObject: Ember.required(Function),
-
-  /**
-    Helper method returns the first object from a collection. This is usually
-    used by bindings and other parts of the framework to extract a single
-    object if the enumerable contains only one item.
-
-    If you override this method, you should implement it so that it will
-    always return the same value each time it is called. If your enumerable
-    contains only one object, this method should always return that object.
-    If your enumerable is empty, this method should return `undefined`.
-
-    ```javascript
-    var arr = ["a", "b", "c"];
-    arr.get('firstObject');  // "a"
-
-    var arr = [];
-    arr.get('firstObject');  // undefined
-    ```
-
-    @property firstObject
-    @return {Object} the object or undefined
-  */
-  firstObject: Ember.computed(function() {
-    if (get(this, 'length')===0) return undefined ;
-
-    // handle generic enumerables
-    var context = popCtx(), ret;
-    ret = this.nextObject(0, null, context);
-    pushCtx(context);
-    return ret ;
-  }).property('[]'),
-
-  /**
-    Helper method returns the last object from a collection. If your enumerable
-    contains only one object, this method should always return that object.
-    If your enumerable is empty, this method should return `undefined`.
-
-    ```javascript
-    var arr = ["a", "b", "c"];
-    arr.get('lastObject');  // "c"
-
-    var arr = [];
-    arr.get('lastObject');  // undefined
-    ```
-
-    @property lastObject
-    @return {Object} the last object or undefined
-  */
-  lastObject: Ember.computed(function() {
-    var len = get(this, 'length');
-    if (len===0) return undefined ;
-    var context = popCtx(), idx=0, cur, last = null;
-    do {
-      last = cur;
-      cur = this.nextObject(idx++, last, context);
-    } while (cur !== undefined);
-    pushCtx(context);
-    return last;
-  }).property('[]'),
-
-  /**
-    Returns `true` if the passed object can be found in the receiver. The
-    default version will iterate through the enumerable until the object
-    is found. You may want to override this with a more efficient version.
-
-    ```javascript
-    var arr = ["a", "b", "c"];
-    arr.contains("a"); // true
-    arr.contains("z"); // false
-    ```
-
-    @method contains
-    @param {Object} obj The object to search for.
-    @return {Boolean} `true` if object is found in enumerable.
-  */
-  contains: function(obj) {
-    return this.find(function(item) { return item===obj; }) !== undefined;
-  },
-
-  /**
-    Iterates through the enumerable, calling the passed function on each
-    item. This method corresponds to the `forEach()` method defined in
-    JavaScript 1.6.
-
-    The callback method you provide should have the following signature (all
-    parameters are optional):
-
-    ```javascript
-    function(item, index, enumerable);
-    ```
-
-    - `item` is the current item in the iteration.
-    - `index` is the current index in the iteration.
-    - `enumerable` is the enumerable object itself.
-
-    Note that in addition to a callback, you can also pass an optional target
-    object that will be set as `this` on the context. This is a good way
-    to give your iterator function access to the current object.
-
-    @method forEach
-    @param {Function} callback The callback to execute
-    @param {Object} [target] The target object to use
-    @return {Object} receiver
-  */
-  forEach: function(callback, target) {
-    if (typeof callback !== "function") throw new TypeError() ;
-    var len = get(this, 'length'), last = null, context = popCtx();
-
-    if (target === undefined) target = null;
-
-    for(var idx=0;idx<len;idx++) {
-      var next = this.nextObject(idx, last, context) ;
-      callback.call(target, next, idx, this);
-      last = next ;
-    }
-    last = null ;
-    context = pushCtx(context);
-    return this ;
-  },
-
-  /**
-    Alias for `mapBy`
-
-    @method getEach
-    @param {String} key name of the property
-    @return {Array} The mapped array.
-  */
-  getEach: function(key) {
-    return this.mapBy(key);
-  },
-
-  /**
-    Sets the value on the named property for each member. This is more
-    efficient than using other methods defined on this helper. If the object
-    implements Ember.Observable, the value will be changed to `set(),` otherwise
-    it will be set directly. `null` objects are skipped.
-
-    @method setEach
-    @param {String} key The key to set
-    @param {Object} value The object to set
-    @return {Object} receiver
-  */
-  setEach: function(key, value) {
-    return this.forEach(function(item) {
-      set(item, key, value);
-    });
-  },
-
-  /**
-    Maps all of the items in the enumeration to another value, returning
-    a new array. This method corresponds to `map()` defined in JavaScript 1.6.
-
-    The callback method you provide should have the following signature (all
-    parameters are optional):
-
-    ```javascript
-    function(item, index, enumerable);
-    ```
-
-    - `item` is the current item in the iteration.
-    - `index` is the current index in the iteration.
-    - `enumerable` is the enumerable object itself.
-
-    It should return the mapped value.
-
-    Note that in addition to a callback, you can also pass an optional target
-    object that will be set as `this` on the context. This is a good way
-    to give your iterator function access to the current object.
-
-    @method map
-    @param {Function} callback The callback to execute
-    @param {Object} [target] The target object to use
-    @return {Array} The mapped array.
-  */
-  map: function(callback, target) {
-    var ret = Ember.A();
-    this.forEach(function(x, idx, i) {
-      ret[idx] = callback.call(target, x, idx,i);
-    });
-    return ret ;
-  },
-
-  /**
-    Similar to map, this specialized function returns the value of the named
-    property on all items in the enumeration.
-
-    @method mapBy
-    @param {String} key name of the property
-    @return {Array} The mapped array.
-  */
-  mapBy: function(key) {
-    return this.map(function(next) {
-      return get(next, key);
-    });
-  },
-
-  /**
-    Similar to map, this specialized function returns the value of the named
-    property on all items in the enumeration.
-
-    @method mapProperty
-    @param {String} key name of the property
-    @return {Array} The mapped array.
-    @deprecated Use `mapBy` instead
-  */
-
-  mapProperty: Ember.aliasMethod('mapBy'),
-
-  /**
-    Returns an array with all of the items in the enumeration that the passed
-    function returns true for. This method corresponds to `filter()` defined in
-    JavaScript 1.6.
-
-    The callback method you provide should have the following signature (all
-    parameters are optional):
-
-    ```javascript
-    function(item, index, enumerable);
-    ```
-
-    - `item` is the current item in the iteration.
-    - `index` is the current index in the iteration.
-    - `enumerable` is the enumerable object itself.
-
-    It should return the `true` to include the item in the results, `false`
-    otherwise.
-
-    Note that in addition to a callback, you can also pass an optional target
-    object that will be set as `this` on the context. This is a good way
-    to give your iterator function access to the current object.
-
-    @method filter
-    @param {Function} callback The callback to execute
-    @param {Object} [target] The target object to use
-    @return {Array} A filtered array.
-  */
-  filter: function(callback, target) {
-    var ret = Ember.A();
-    this.forEach(function(x, idx, i) {
-      if (callback.call(target, x, idx, i)) ret.push(x);
-    });
-    return ret ;
-  },
-
-  /**
-    Returns an array with all of the items in the enumeration where the passed
-    function returns false for. This method is the inverse of filter().
-
-    The callback method you provide should have the following signature (all
-    parameters are optional):
-
-          function(item, index, enumerable);
-
-    - *item* is the current item in the iteration.
-    - *index* is the current index in the iteration
-    - *enumerable* is the enumerable object itself.
-
-    It should return the a falsey value to include the item in the results.
-
-    Note that in addition to a callback, you can also pass an optional target
-    object that will be set as "this" on the context. This is a good way
-    to give your iterator function access to the current object.
-
-    @method reject
-    @param {Function} callback The callback to execute
-    @param {Object} [target] The target object to use
-    @return {Array} A rejected array.
-   */
-  reject: function(callback, target) {
-    return this.filter(function() {
-      return !(callback.apply(target, arguments));
-    });
-  },
-
-  /**
-    Returns an array with just the items with the matched property. You
-    can pass an optional second argument with the target value. Otherwise
-    this will match any property that evaluates to `true`.
-
-    @method filterBy
-    @param {String} key the property to test
-    @param {String} [value] optional value to test against.
-    @return {Array} filtered array
-  */
-  filterBy: function(key, value) {
-    return this.filter(iter.apply(this, arguments));
-  },
-
-  /**
-    Returns an array with just the items with the matched property. You
-    can pass an optional second argument with the target value. Otherwise
-    this will match any property that evaluates to `true`.
-
-    @method filterProperty
-    @param {String} key the property to test
-    @param {String} [value] optional value to test against.
-    @return {Array} filtered array
-    @deprecated Use `filterBy` instead
-  */
-  filterProperty: Ember.aliasMethod('filterBy'),
-
-  /**
-    Returns an array with the items that do not have truthy values for
-    key.  You can pass an optional second argument with the target value.  Otherwise
-    this will match any property that evaluates to false.
-
-    @method rejectBy
-    @param {String} key the property to test
-    @param {String} [value] optional value to test against.
-    @return {Array} rejected array
-  */
-  rejectBy: function(key, value) {
-    var exactValue = function(item) { return get(item, key) === value; },
-        hasValue = function(item) { return !!get(item, key); },
-        use = (arguments.length === 2 ? exactValue : hasValue);
-
-    return this.reject(use);
-  },
-
-  /**
-    Returns an array with the items that do not have truthy values for
-    key.  You can pass an optional second argument with the target value.  Otherwise
-    this will match any property that evaluates to false.
-
-    @method rejectProperty
-    @param {String} key the property to test
-    @param {String} [value] optional value to test against.
-    @return {Array} rejected array
-    @deprecated Use `rejectBy` instead
-  */
-  rejectProperty: Ember.aliasMethod('rejectBy'),
-
-  /**
-    Returns the first item in the array for which the callback returns true.
-    This method works similar to the `filter()` method defined in JavaScript 1.6
-    except that it will stop working on the array once a match is found.
-
-    The callback method you provide should have the following signature (all
-    parameters are optional):
-
-    ```javascript
-    function(item, index, enumerable);
-    ```
-
-    - `item` is the current item in the iteration.
-    - `index` is the current index in the iteration.
-    - `enumerable` is the enumerable object itself.
-
-    It should return the `true` to include the item in the results, `false`
-    otherwise.
-
-    Note that in addition to a callback, you can also pass an optional target
-    object that will be set as `this` on the context. This is a good way
-    to give your iterator function access to the current object.
-
-    @method find
-    @param {Function} callback The callback to execute
-    @param {Object} [target] The target object to use
-    @return {Object} Found item or `undefined`.
-  */
-  find: function(callback, target) {
-    var len = get(this, 'length') ;
-    if (target === undefined) target = null;
-
-    var last = null, next, found = false, ret ;
-    var context = popCtx();
-    for(var idx=0;idx<len && !found;idx++) {
-      next = this.nextObject(idx, last, context) ;
-      if (found = callback.call(target, next, idx, this)) ret = next ;
-      last = next ;
-    }
-    next = last = null ;
-    context = pushCtx(context);
-    return ret ;
-  },
-
-  /**
-    Returns the first item with a property matching the passed value. You
-    can pass an optional second argument with the target value. Otherwise
-    this will match any property that evaluates to `true`.
-
-    This method works much like the more generic `find()` method.
-
-    @method findBy
-    @param {String} key the property to test
-    @param {String} [value] optional value to test against.
-    @return {Object} found item or `undefined`
-  */
-  findBy: function(key, value) {
-    return this.find(iter.apply(this, arguments));
-  },
-
-  /**
-    Returns the first item with a property matching the passed value. You
-    can pass an optional second argument with the target value. Otherwise
-    this will match any property that evaluates to `true`.
-
-    This method works much like the more generic `find()` method.
-
-    @method findProperty
-    @param {String} key the property to test
-    @param {String} [value] optional value to test against.
-    @return {Object} found item or `undefined`
-    @deprecated Use `findBy` instead
-  */
-  findProperty: Ember.aliasMethod('findBy'),
-
-  /**
-    Returns `true` if the passed function returns true for every item in the
-    enumeration. This corresponds with the `every()` method in JavaScript 1.6.
-
-    The callback method you provide should have the following signature (all
-    parameters are optional):
-
-    ```javascript
-    function(item, index, enumerable);
-    ```
-
-    - `item` is the current item in the iteration.
-    - `index` is the current index in the iteration.
-    - `enumerable` is the enumerable object itself.
-
-    It should return the `true` or `false`.
-
-    Note that in addition to a callback, you can also pass an optional target
-    object that will be set as `this` on the context. This is a good way
-    to give your iterator function access to the current object.
-
-    Example Usage:
-
-    ```javascript
-    if (people.every(isEngineer)) { Paychecks.addBigBonus(); }
-    ```
-
-    @method every
-    @param {Function} callback The callback to execute
-    @param {Object} [target] The target object to use
-    @return {Boolean}
-  */
-  every: function(callback, target) {
-    return !this.find(function(x, idx, i) {
-      return !callback.call(target, x, idx, i);
-    });
-  },
-
-  /**
-    Returns `true` if the passed property resolves to `true` for all items in
-    the enumerable. This method is often simpler/faster than using a callback.
-
-    @method everyBy
-    @param {String} key the property to test
-    @param {String} [value] optional value to test against.
-    @return {Boolean}
-  */
-  everyBy: function(key, value) {
-    return this.every(iter.apply(this, arguments));
-  },
-
-  /**
-    Returns `true` if the passed property resolves to `true` for all items in
-    the enumerable. This method is often simpler/faster than using a callback.
-
-    @method everyProperty
-    @param {String} key the property to test
-    @param {String} [value] optional value to test against.
-    @return {Boolean}
-    @deprecated Use `everyBy` instead
-  */
-  everyProperty: Ember.aliasMethod('everyBy'),
-
-  /**
-    Returns `true` if the passed function returns true for any item in the
-    enumeration. This corresponds with the `some()` method in JavaScript 1.6.
-
-    The callback method you provide should have the following signature (all
-    parameters are optional):
-
-    ```javascript
-    function(item, index, enumerable);
-    ```
-
-    - `item` is the current item in the iteration.
-    - `index` is the current index in the iteration.
-    - `enumerable` is the enumerable object itself.
-
-    It should return the `true` to include the item in the results, `false`
-    otherwise.
-
-    Note that in addition to a callback, you can also pass an optional target
-    object that will be set as `this` on the context. This is a good way
-    to give your iterator function access to the current object.
-
-    Usage Example:
-
-    ```javascript
-    if (people.any(isManager)) { Paychecks.addBiggerBonus(); }
-    ```
-
-    @method any
-    @param {Function} callback The callback to execute
-    @param {Object} [target] The target object to use
-    @return {Boolean} `true` if the passed function returns `true` for any item
-  */
-  any: function(callback, target) {
-    return !!this.find(function(x, idx, i) {
-      return !!callback.call(target, x, idx, i);
-    });
-  },
-
-  /**
-    Returns `true` if the passed function returns true for any item in the
-    enumeration. This corresponds with the `some()` method in JavaScript 1.6.
-
-    The callback method you provide should have the following signature (all
-    parameters are optional):
-
-    ```javascript
-    function(item, index, enumerable);
-    ```
-
-    - `item` is the current item in the iteration.
-    - `index` is the current index in the iteration.
-    - `enumerable` is the enumerable object itself.
-
-    It should return the `true` to include the item in the results, `false`
-    otherwise.
-
-    Note that in addition to a callback, you can also pass an optional target
-    object that will be set as `this` on the context. This is a good way
-    to give your iterator function access to the current object.
-
-    Usage Example:
-
-    ```javascript
-    if (people.some(isManager)) { Paychecks.addBiggerBonus(); }
-    ```
-
-    @method some
-    @param {Function} callback The callback to execute
-    @param {Object} [target] The target object to use
-    @return {Boolean} `true` if the passed function returns `true` for any item
-    @deprecated Use `any` instead
-  */
-  some: Ember.aliasMethod('any'),
-
-  /**
-    Returns `true` if the passed property resolves to `true` for any item in
-    the enumerable. This method is often simpler/faster than using a callback.
-
-    @method anyBy
-    @param {String} key the property to test
-    @param {String} [value] optional value to test against.
-    @return {Boolean} `true` if the passed function returns `true` for any item
-  */
-  anyBy: function(key, value) {
-    return this.any(iter.apply(this, arguments));
-  },
-
-  /**
-    Returns `true` if the passed property resolves to `true` for any item in
-    the enumerable. This method is often simpler/faster than using a callback.
-
-    @method someProperty
-    @param {String} key the property to test
-    @param {String} [value] optional value to test against.
-    @return {Boolean} `true` if the passed function returns `true` for any item
-    @deprecated Use `anyBy` instead
-  */
-  someProperty: Ember.aliasMethod('anyBy'),
-
-  /**
-    This will combine the values of the enumerator into a single value. It
-    is a useful way to collect a summary value from an enumeration. This
-    corresponds to the `reduce()` method defined in JavaScript 1.8.
-
-    The callback method you provide should have the following signature (all
-    parameters are optional):
-
-    ```javascript
-    function(previousValue, item, index, enumerable);
-    ```
-
-    - `previousValue` is the value returned by the last call to the iterator.
-    - `item` is the current item in the iteration.
-    - `index` is the current index in the iteration.
-    - `enumerable` is the enumerable object itself.
-
-    Return the new cumulative value.
-
-    In addition to the callback you can also pass an `initialValue`. An error
-    will be raised if you do not pass an initial value and the enumerator is
-    empty.
-
-    Note that unlike the other methods, this method does not allow you to
-    pass a target object to set as this for the callback. It's part of the
-    spec. Sorry.
-
-    @method reduce
-    @param {Function} callback The callback to execute
-    @param {Object} initialValue Initial value for the reduce
-    @param {String} reducerProperty internal use only.
-    @return {Object} The reduced value.
-  */
-  reduce: function(callback, initialValue, reducerProperty) {
-    if (typeof callback !== "function") { throw new TypeError(); }
-
-    var ret = initialValue;
-
-    this.forEach(function(item, i) {
-      ret = callback.call(null, ret, item, i, this, reducerProperty);
-    }, this);
-
-    return ret;
-  },
-
-  /**
-    Invokes the named method on every object in the receiver that
-    implements it. This method corresponds to the implementation in
-    Prototype 1.6.
-
-    @method invoke
-    @param {String} methodName the name of the method
-    @param {Object...} args optional arguments to pass as well.
-    @return {Array} return values from calling invoke.
-  */
-  invoke: function(methodName) {
-    var args, ret = Ember.A();
-    if (arguments.length>1) args = a_slice.call(arguments, 1);
-
-    this.forEach(function(x, idx) {
-      var method = x && x[methodName];
-      if ('function' === typeof method) {
-        ret[idx] = args ? method.apply(x, args) : method.call(x);
-      }
-    }, this);
-
-    return ret;
-  },
-
-  /**
-    Simply converts the enumerable into a genuine array. The order is not
-    guaranteed. Corresponds to the method implemented by Prototype.
-
-    @method toArray
-    @return {Array} the enumerable as an array.
-  */
-  toArray: function() {
-    var ret = Ember.A();
-    this.forEach(function(o, idx) { ret[idx] = o; });
-    return ret ;
-  },
-
-  /**
-    Returns a copy of the array with all null and undefined elements removed.
-
-    ```javascript
-    var arr = ["a", null, "c", undefined];
-    arr.compact();  // ["a", "c"]
-    ```
-
-    @method compact
-    @return {Array} the array without null and undefined elements.
-  */
-  compact: function() {
-    return this.filter(function(value) { return value != null; });
-  },
-
-  /**
-    Returns a new enumerable that excludes the passed value. The default
-    implementation returns an array regardless of the receiver type unless
-    the receiver does not contain the value.
-
-    ```javascript
-    var arr = ["a", "b", "a", "c"];
-    arr.without("a");  // ["b", "c"]
-    ```
-
-    @method without
-    @param {Object} value
-    @return {Ember.Enumerable}
-  */
-  without: function(value) {
-    if (!this.contains(value)) return this; // nothing to do
-    var ret = Ember.A();
-    this.forEach(function(k) {
-      if (k !== value) ret[ret.length] = k;
-    }) ;
-    return ret ;
-  },
-
-  /**
-    Returns a new enumerable that contains only unique values. The default
-    implementation returns an array regardless of the receiver type.
-
-    ```javascript
-    var arr = ["a", "a", "b", "b"];
-    arr.uniq();  // ["a", "b"]
-    ```
-
-    @method uniq
-    @return {Ember.Enumerable}
-  */
-  uniq: function() {
-    var ret = Ember.A();
-    this.forEach(function(k) {
-      if (a_indexOf(ret, k)<0) ret.push(k);
-    });
-    return ret;
-  },
-
-  /**
-    This property will trigger anytime the enumerable's content changes.
-    You can observe this property to be notified of changes to the enumerables
-    content.
-
-    For plain enumerables, this property is read only. `Ember.Array` overrides
-    this method.
-
-    @property []
-    @type Ember.Array
-    @return this
-  */
-  '[]': Ember.computed(function(key, value) {
-    return this;
-  }),
-
-  // ..........................................................
-  // ENUMERABLE OBSERVERS
-  //
-
-  /**
-    Registers an enumerable observer. Must implement `Ember.EnumerableObserver`
-    mixin.
-
-    @method addEnumerableObserver
-    @param {Object} target
-    @param {Hash} [opts]
-    @return this
-  */
-  addEnumerableObserver: function(target, opts) {
-    var willChange = (opts && opts.willChange) || 'enumerableWillChange',
-        didChange  = (opts && opts.didChange) || 'enumerableDidChange';
-
-    var hasObservers = get(this, 'hasEnumerableObservers');
-    if (!hasObservers) Ember.propertyWillChange(this, 'hasEnumerableObservers');
-    Ember.addListener(this, '@enumerable:before', target, willChange);
-    Ember.addListener(this, '@enumerable:change', target, didChange);
-    if (!hasObservers) Ember.propertyDidChange(this, 'hasEnumerableObservers');
-    return this;
-  },
-
-  /**
-    Removes a registered enumerable observer.
-
-    @method removeEnumerableObserver
-    @param {Object} target
-    @param {Hash} [opts]
-    @return this
-  */
-  removeEnumerableObserver: function(target, opts) {
-    var willChange = (opts && opts.willChange) || 'enumerableWillChange',
-        didChange  = (opts && opts.didChange) || 'enumerableDidChange';
-
-    var hasObservers = get(this, 'hasEnumerableObservers');
-    if (hasObservers) Ember.propertyWillChange(this, 'hasEnumerableObservers');
-    Ember.removeListener(this, '@enumerable:before', target, willChange);
-    Ember.removeListener(this, '@enumerable:change', target, didChange);
-    if (hasObservers) Ember.propertyDidChange(this, 'hasEnumerableObservers');
-    return this;
-  },
-
-  /**
-    Becomes true whenever the array currently has observers watching changes
-    on the array.
-
-    @property hasEnumerableObservers
-    @type Boolean
-  */
-  hasEnumerableObservers: Ember.computed(function() {
-    return Ember.hasListeners(this, '@enumerable:change') || Ember.hasListeners(this, '@enumerable:before');
-  }),
-
-
-  /**
-    Invoke this method just before the contents of your enumerable will
-    change. You can either omit the parameters completely or pass the objects
-    to be removed or added if available or just a count.
-
-    @method enumerableContentWillChange
-    @param {Ember.Enumerable|Number} removing An enumerable of the objects to
-      be removed or the number of items to be removed.
-    @param {Ember.Enumerable|Number} adding An enumerable of the objects to be
-      added or the number of items to be added.
-    @chainable
-  */
-  enumerableContentWillChange: function(removing, adding) {
-
-    var removeCnt, addCnt, hasDelta;
-
-    if ('number' === typeof removing) removeCnt = removing;
-    else if (removing) removeCnt = get(removing, 'length');
-    else removeCnt = removing = -1;
-
-    if ('number' === typeof adding) addCnt = adding;
-    else if (adding) addCnt = get(adding,'length');
-    else addCnt = adding = -1;
-
-    hasDelta = addCnt<0 || removeCnt<0 || addCnt-removeCnt!==0;
-
-    if (removing === -1) removing = null;
-    if (adding   === -1) adding   = null;
-
-    Ember.propertyWillChange(this, '[]');
-    if (hasDelta) Ember.propertyWillChange(this, 'length');
-    Ember.sendEvent(this, '@enumerable:before', [this, removing, adding]);
-
-    return this;
-  },
-
-  /**
-    Invoke this method when the contents of your enumerable has changed.
-    This will notify any observers watching for content changes. If your are
-    implementing an ordered enumerable (such as an array), also pass the
-    start and end values where the content changed so that it can be used to
-    notify range observers.
-
-    @method enumerableContentDidChange
-    @param {Number} [start] optional start offset for the content change.
-      For unordered enumerables, you should always pass -1.
-    @param {Ember.Enumerable|Number} removing An enumerable of the objects to
-      be removed or the number of items to be removed.
-    @param {Ember.Enumerable|Number} adding  An enumerable of the objects to
-      be added or the number of items to be added.
-    @chainable
-  */
-  enumerableContentDidChange: function(removing, adding) {
-    var removeCnt, addCnt, hasDelta;
-
-    if ('number' === typeof removing) removeCnt = removing;
-    else if (removing) removeCnt = get(removing, 'length');
-    else removeCnt = removing = -1;
-
-    if ('number' === typeof adding) addCnt = adding;
-    else if (adding) addCnt = get(adding, 'length');
-    else addCnt = adding = -1;
-
-    hasDelta = addCnt<0 || removeCnt<0 || addCnt-removeCnt!==0;
-
-    if (removing === -1) removing = null;
-    if (adding   === -1) adding   = null;
-
-    Ember.sendEvent(this, '@enumerable:change', [this, removing, adding]);
-    if (hasDelta) Ember.propertyDidChange(this, 'length');
-    Ember.propertyDidChange(this, '[]');
-
-    return this ;
-  }
-
-}) ;
-
-})();
-
-
-
-(function() {
-/**
-@module ember
-@submodule ember-runtime
-*/
-
-// ..........................................................
-// HELPERS
-//
-
-var get = Ember.get, set = Ember.set, isNone = Ember.isNone, map = Ember.EnumerableUtils.map, cacheFor = Ember.cacheFor;
-
-// ..........................................................
-// ARRAY
-//
-/**
-  This module implements Observer-friendly Array-like behavior. This mixin is
-  picked up by the Array class as well as other controllers, etc. that want to
-  appear to be arrays.
-
-  Unlike `Ember.Enumerable,` this mixin defines methods specifically for
-  collections that provide index-ordered access to their contents. When you
-  are designing code that needs to accept any kind of Array-like object, you
-  should use these methods instead of Array primitives because these will
-  properly notify observers of changes to the array.
-
-  Although these methods are efficient, they do add a layer of indirection to
-  your application so it is a good idea to use them only when you need the
-  flexibility of using both true JavaScript arrays and "virtual" arrays such
-  as controllers and collections.
-
-  You can use the methods defined in this module to access and modify array
-  contents in a KVO-friendly way. You can also be notified whenever the
-  membership of an array changes by changing the syntax of the property to
-  `.observes('*myProperty.[]')`.
-
-  To support `Ember.Array` in your own class, you must override two
-  primitives to use it: `replace()` and `objectAt()`.
-
-  Note that the Ember.Array mixin also incorporates the `Ember.Enumerable`
-  mixin. All `Ember.Array`-like objects are also enumerable.
-
-  @class Array
-  @namespace Ember
-  @uses Ember.Enumerable
-  @since Ember 0.9.0
-*/
-Ember.Array = Ember.Mixin.create(Ember.Enumerable, /** @scope Ember.Array.prototype */ {
-
-  /**
-    Your array must support the `length` property. Your replace methods should
-    set this property whenever it changes.
-
-    @property {Number} length
-  */
-  length: Ember.required(),
-
-  /**
-    Returns the object at the given `index`. If the given `index` is negative
-    or is greater or equal than the array length, returns `undefined`.
-
-    This is one of the primitives you must implement to support `Ember.Array`.
-    If your object supports retrieving the value of an array item using `get()`
-    (i.e. `myArray.get(0)`), then you do not need to implement this method
-    yourself.
-
-    ```javascript
-    var arr = ['a', 'b', 'c', 'd'];
-    arr.objectAt(0);   // "a"
-    arr.objectAt(3);   // "d"
-    arr.objectAt(-1);  // undefined
-    arr.objectAt(4);   // undefined
-    arr.objectAt(5);   // undefined
-    ```
-
-    @method objectAt
-    @param {Number} idx The index of the item to return.
-    @return {*} item at index or undefined
-  */
-  objectAt: function(idx) {
-    if ((idx < 0) || (idx>=get(this, 'length'))) return undefined ;
-    return get(this, idx);
-  },
-
-  /**
-    This returns the objects at the specified indexes, using `objectAt`.
-
-    ```javascript
-    var arr =Â ['a', 'b', 'c', 'd'];
-    arr.objectsAt([0, 1, 2]);  // ["a", "b", "c"]
-    arr.objectsAt([2, 3, 4]);  // ["c", "d", undefined]
-    ```
-
-    @method objectsAt
-    @param {Array} indexes An array of indexes of items to return.
-    @return {Array}
-   */
-  objectsAt: function(indexes) {
-    var self = this;
-    return map(indexes, function(idx) { return self.objectAt(idx); });
-  },
-
-  // overrides Ember.Enumerable version
-  nextObject: function(idx) {
-    return this.objectAt(idx);
-  },
-
-  /**
-    This is the handler for the special array content property. If you get
-    this property, it will return this. If you set this property it a new
-    array, it will replace the current content.
-
-    This property overrides the default property defined in `Ember.Enumerable`.
-
-    @property []
-    @return this
-  */
-  '[]': Ember.computed(function(key, value) {
-    if (value !== undefined) this.replace(0, get(this, 'length'), value) ;
-    return this ;
-  }),
-
-  firstObject: Ember.computed(function() {
-    return this.objectAt(0);
-  }),
-
-  lastObject: Ember.computed(func
+  ["rsvp/events","rsvp/promise","rsvp/node","rsvp/all","rsvp/hash","rsvp/rethrow","rsvp/defer","rsvp/config","rs
